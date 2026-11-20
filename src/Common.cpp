@@ -220,22 +220,98 @@ std::filesystem::path GetExecutableDir() {
     return std::filesystem::current_path();
 }
 
+bool IsPortableMode() {
+    static bool checked = false;
+    static bool portable = false;
+    if (!checked) {
+        auto exeDir = GetExecutableDir();
+        // Activate portable mode only if explicit "portable.txt" marker is placed alongside exe
+        if (std::filesystem::exists(exeDir / "portable.txt")) {
+            portable = true;
+        }
+        checked = true;
+    }
+    return portable;
+}
+
+std::filesystem::path GetAppDataDir() {
+    if (IsPortableMode()) {
+        return GetExecutableDir();
+    }
+
+    static std::filesystem::path s_appDataDir;
+    if (!s_appDataDir.empty()) {
+        return s_appDataDir;
+    }
+
+    PWSTR path = nullptr;
+    if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, nullptr, &path))) {
+        s_appDataDir = std::filesystem::path(path) / "eBooster";
+        CoTaskMemFree(path);
+    } else {
+        wchar_t envBuf[MAX_PATH];
+        DWORD envLen = GetEnvironmentVariableW(L"LOCALAPPDATA", envBuf, MAX_PATH);
+        if (envLen > 0 && envLen < MAX_PATH) {
+            s_appDataDir = std::filesystem::path(envBuf) / "eBooster";
+        } else {
+            s_appDataDir = GetExecutableDir();
+        }
+    }
+
+    std::error_code ec;
+    std::filesystem::create_directories(s_appDataDir, ec);
+    return s_appDataDir;
+}
+
+std::filesystem::path GetAppCacheDir() {
+    auto cacheDir = GetAppDataDir() / "cache";
+    std::error_code ec;
+    std::filesystem::create_directories(cacheDir, ec);
+    return cacheDir;
+}
+
 std::filesystem::path ResolveConfigPath(const std::filesystem::path& relPath) {
-    auto exeDir = GetExecutableDir();
-    auto p1 = exeDir / relPath;
-    if (std::filesystem::exists(p1)) return p1;
+    if (IsPortableMode()) {
+        auto p = GetExecutableDir() / relPath;
+        std::error_code ec;
+        std::filesystem::create_directories(p.parent_path(), ec);
+        return p;
+    }
 
-    auto cwd = std::filesystem::current_path();
-    auto p2 = cwd / relPath;
-    if (std::filesystem::exists(p2)) return p2;
+    auto appData = GetAppDataDir();
+    auto dest = appData / relPath;
 
-    auto p3 = exeDir.parent_path() / relPath;
-    if (std::filesystem::exists(p3)) return p3;
+    // If configuration doesn't exist in AppData yet, check for shipped seed defaults
+    if (!std::filesystem::exists(dest)) {
+        std::error_code ec;
+        auto seed = GetExecutableDir() / relPath;
+        if (std::filesystem::exists(seed)) {
+            std::filesystem::create_directories(dest.parent_path(), ec);
+            std::filesystem::copy_file(seed, dest, std::filesystem::copy_options::overwrite_existing, ec);
+        } else {
+            auto devSeed = GetExecutableDir().parent_path().parent_path() / relPath;
+            if (std::filesystem::exists(devSeed)) {
+                std::filesystem::create_directories(dest.parent_path(), ec);
+                std::filesystem::copy_file(devSeed, dest, std::filesystem::copy_options::overwrite_existing, ec);
+            }
+        }
+    }
 
-    auto p4 = exeDir.parent_path().parent_path() / relPath;
-    if (std::filesystem::exists(p4)) return p4;
+    std::error_code ec;
+    std::filesystem::create_directories(dest.parent_path(), ec);
+    return dest;
+}
 
-    return p1;
+bool OpenFolderInExplorer(const std::filesystem::path& path) {
+    std::error_code ec;
+    if (!std::filesystem::exists(path, ec)) {
+        std::filesystem::create_directories(path, ec);
+    }
+    HINSTANCE hInst = ShellExecuteW(nullptr, L"explore", path.wstring().c_str(), nullptr, nullptr, SW_SHOW);
+    if (reinterpret_cast<INT_PTR>(hInst) <= 32) {
+        hInst = ShellExecuteW(nullptr, L"open", path.wstring().c_str(), nullptr, nullptr, SW_SHOW);
+    }
+    return reinterpret_cast<INT_PTR>(hInst) > 32;
 }
 
 std::optional<uint32_t> PingHost(const std::string& ipAddress, uint32_t timeoutMs) {

@@ -81,6 +81,7 @@ target_link_libraries(eBooster PRIVATE
     shlwapi
     crypt32
     winhttp
+    shell32
 )
 
 # -------------------------------------------------------------
