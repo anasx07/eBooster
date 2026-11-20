@@ -44,22 +44,53 @@ jobs:
           $distExe = "dist\eBooster.exe"
           $distPortable = "dist\eBooster-Portable.exe"
           $distSetup = "dist\eBooster-Setup.exe"
+          $distChecksums = "dist\checksums.txt"
           
           if (-not (Test-Path $distExe)) { throw "Executable was not produced at: $distExe" }
           if (-not (Test-Path $distPortable)) { throw "Portable executable was not produced at: $distPortable" }
           if (-not (Test-Path $distSetup)) { throw "Setup installer was not produced at: $distSetup" }
+          if (-not (Test-Path $distChecksums)) { throw "Checksums file was not produced at: $distChecksums" }
           
           Write-Host "`nGenerated Release Artifacts in dist/:" -ForegroundColor Green
           Get-ChildItem -Path dist\ | Format-Table Name, Length, LastWriteTime
+
+          # Generate structured release notes
+          $setupHash = (Get-FileHash $distSetup -Algorithm SHA256).Hash.ToLower()
+          $portableHash = (Get-FileHash $distPortable -Algorithm SHA256).Hash.ToLower()
+          
+          $releaseNotes = @"
+          ## ⚡ eBooster Pro $versionTag
+
+          ### 📦 Which file should I download?
+          - 📦 **eBooster-Setup.exe** (*Recommended*): Complete Windows Installer with Start Menu & Desktop shortcuts.
+          - 🚀 **eBooster-Portable.exe**: Single standalone executable for USB sticks or zero-install usage.
+
+          ---
+
+          ### 🛡️ Verified SHA-256 Hashes
+          ```
+          $setupHash  eBooster-Setup.exe
+          $portableHash  eBooster-Portable.exe
+          ```
+
+          ---
+
+          ### 🔒 Anti-Cheat & System Safety
+          - **100% Anti-Cheat Compliant**: Operates purely at the Windows Filtering Platform (WFP) network layer.
+          - **Zero DLL Injection**: Never accesses game memory, injects code, or modifies game binaries.
+          "@
+          Set-Content -Path dist\release_notes.md -Value $releaseNotes -Encoding UTF8
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: eBooster Pro ${{ github.ref_name }}
+          body_path: dist/release_notes.md
           generate_release_notes: true
           files: |
             dist/eBooster-Setup.exe
             dist/eBooster-Portable.exe
+            dist/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

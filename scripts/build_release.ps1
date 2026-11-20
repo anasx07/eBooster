@@ -176,6 +176,22 @@ if ($isccExe -and (Test-Path $issScript)) {
     Write-Host "      Inno Setup not found locally. Installer will be built automatically on GitHub Actions CI/CD." -ForegroundColor Yellow
 }
 
+# 6. Generate SHA-256 Checksums (checksums.txt)
+$checksumFile = Join-Path $distRootDir "checksums.txt"
+$checksumLines = @()
+foreach ($distFile in @($targetSetup, $targetPortable)) {
+    if (Test-Path $distFile) {
+        $fHash = (Get-FileHash -Path $distFile -Algorithm SHA256).Hash.ToLower()
+        $fName = Split-Path $distFile -Leaf
+        $checksumLines += "$fHash  $fName"
+    }
+}
+if ($checksumLines.Count -gt 0) {
+    $checksumContent = ($checksumLines -join "`r`n") + "`r`n"
+    Set-Content -Path $checksumFile -Value $checksumContent -NoNewline -Encoding ASCII
+    Write-Host "      Generated Checksums    -> $checksumFile" -ForegroundColor Green
+}
+
 # Verification and Summary
 $exeItem = Get-Item $targetExe
 $sizeMB = [math]::Round($exeItem.Length / 1MB, 2)
@@ -191,6 +207,9 @@ if (Test-Path $targetSetup) {
     $setupItem = Get-Item $targetSetup
     $setupMB = [math]::Round($setupItem.Length / 1MB, 2)
     Write-Host "Setup Package  : $targetSetup ($setupMB MB)" -ForegroundColor Magenta
+}
+if (Test-Path $checksumFile) {
+    Write-Host "Checksums File : $checksumFile" -ForegroundColor Gray
 }
 Write-Host "SHA256 (Base)  : $hash" -ForegroundColor Gray
 Write-Host "======================================================================`n" -ForegroundColor Green
