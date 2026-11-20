@@ -249,8 +249,10 @@ Write-Host ""
 Write-Host "What happens next:" -ForegroundColor Gray
 Write-Host "  1. GitHub spins up a Windows Server runner with Visual Studio." -ForegroundColor Gray
 Write-Host "  2. Compiles standalone MSVC eBooster.exe (/MT static runtime)." -ForegroundColor Gray
-Write-Host "  3. Publishes GitHub Release with single standalone eBooster.exe." -ForegroundColor Gray
-Write-Host "  4. All eBooster client apps will auto-detect the update!" -ForegroundColor Magenta
+Write-Host "  3. Compiles Inno Setup installer: eBooster-Setup.exe." -ForegroundColor Gray
+Write-Host "  4. Packages portable executable: eBooster-Portable.exe." -ForegroundColor Gray
+Write-Host "  5. Publishes GitHub Release with both Installer & Portable assets!" -ForegroundColor Green
+Write-Host "  6. All active eBooster client apps will auto-detect the update!" -ForegroundColor Magenta
 Write-Host "======================================================================`n" -ForegroundColor Cyan
 
 $openBrowser = Read-Host "Open GitHub Actions live build in browser? [Y/n] (default: Y)"

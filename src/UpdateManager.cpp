@@ -315,14 +315,17 @@ void UpdateManager::CheckForUpdatesAsync(std::function<void(const UpdateInfo&)> 
                     return static_cast<char>(std::tolower(c));
                 });
 
-                if (lowerName == "ebooster.exe") {
+                // For in-app binary replacement, never download setup/installer packages
+                if (lowerName.find("setup") != std::string::npos || lowerName.find("installer") != std::string::npos) {
+                    searchPos = nextUrl + 22;
+                    continue;
+                }
+
+                if (lowerName == "ebooster.exe" || lowerName == "ebooster-portable.exe") {
                     info.downloadUrl = assetUrl;
                     info.assetName = assetName;
                     break;
                 } else if (lowerName.ends_with(".exe") && candidateUrl.empty()) {
-                    candidateUrl = assetUrl;
-                    candidateName = assetName;
-                } else if (lowerName.ends_with(".zip") && candidateUrl.empty()) {
                     candidateUrl = assetUrl;
                     candidateName = assetName;
                 }
