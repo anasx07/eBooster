@@ -190,15 +190,21 @@ eBooster/
 
 ---
 
-## ⚡ Quick Start & Installation
+## ⚡ Quick Start & Download
 
-### Single Standalone Executable (Zero Setup)
-1. Download `eBooster.exe` directly from the [GitHub Releases page](https://github.com/anasx07/eBooster/releases).
-2. Run `eBooster.exe` anywhere (Desktop, Downloads, etc.) — **zero unzipping or installation required**.
-   - The application automatically requests Administrator elevation via embedded manifest (required for WFP packet filters and registry pacing).
+Download the latest release for Windows from the [GitHub Releases page](https://github.com/anasx07/eBooster/releases):
+
+| Distribution | File | Best For | Features |
+| :--- | :--- | :--- | :--- |
+| 📦 **Installer** *(Recommended)* | `eBooster-Setup.exe` | Most Gamers | Installs into `Program Files`, adds Start Menu & Desktop shortcuts, registers clean Uninstaller in Windows. |
+| 🚀 **Portable** | `eBooster-Portable.exe` | Zero-Install & USB | Single standalone executable. Run anywhere without installing or writing to Desktop. |
+
+### How to Use:
+1. Download **`eBooster-Setup.exe`** (or **`eBooster-Portable.exe`**).
+2. Launch eBooster (it automatically requests Administrator elevation for WFP kernel packet filtering).
 3. Select your game profile (e.g. **eFootball [Steam]**).
-4. Activate the **Anti-Lag Shield** and pick your target dedicated server.
-5. Launch your game!
+4. Activate the **Anti-Lag Shield** and select your preferred dedicated server region.
+5. Launch your game and play with minimum latency!
 
 ---
 

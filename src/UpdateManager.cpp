@@ -321,7 +321,7 @@ void UpdateManager::CheckForUpdatesAsync(std::function<void(const UpdateInfo&)> 
                     continue;
                 }
 
-                if (lowerName == "ebooster.exe" || lowerName == "ebooster-portable.exe") {
+                if (lowerName == "ebooster-portable.exe" || lowerName == "ebooster.exe") {
                     info.downloadUrl = assetUrl;
                     info.assetName = assetName;
                     break;

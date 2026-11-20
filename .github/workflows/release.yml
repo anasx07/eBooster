@@ -61,6 +61,5 @@ jobs:
           files: |
             dist/eBooster-Setup.exe
             dist/eBooster-Portable.exe
-            dist/eBooster.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
