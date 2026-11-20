@@ -81,6 +81,40 @@ jobs:
           "@
           Set-Content -Path dist\release_notes.md -Value $releaseNotes -Encoding UTF8
 
+      - name: Sign Binaries (Windows Authenticode / SmartScreen)
+        shell: powershell
+        env:
+          CERT_BASE64: ${{ secrets.CERTIFICATE_BASE64 }}
+          CERT_PASS: ${{ secrets.CERTIFICATE_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:CERT_BASE64)) {
+            Write-Host "ℹ️ No code signing certificate secret (CERTIFICATE_BASE64) detected. Skipping Authenticode signing." -ForegroundColor Yellow
+            return
+          }
+
+          Write-Host "🔐 Found code signing secret! Preparing certificate..." -ForegroundColor Cyan
+          $certBytes = [System.Convert]::FromBase64String($env:CERT_BASE64)
+          $certTemp = Join-Path $env:RUNNER_TEMP "cert_$([System.Guid]::NewGuid().ToString('N')).pfx"
+          [System.IO.File]::WriteAllBytes($certTemp, $certBytes)
+
+          try {
+            $signtoolItem = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin" -Filter signtool.exe -Recurse | Select-Object -First 1
+            if (-not $signtoolItem) { throw "signtool.exe not found in Windows Kits." }
+            $signtool = $signtoolItem.FullName
+            
+            Write-Host "Signing eBooster-Setup.exe and eBooster-Portable.exe using $signtool..." -ForegroundColor Cyan
+            & $signtool sign /fd SHA256 /tr "http://timestamp.digicert.com" /td SHA256 /f $certTemp /p $env:CERT_PASS "dist\eBooster-Setup.exe" "dist\eBooster-Portable.exe"
+            
+            # Recalculate checksums with newly signed hashes
+            $setupHash = (Get-FileHash dist\eBooster-Setup.exe -Algorithm SHA256).Hash.ToLower()
+            $portableHash = (Get-FileHash dist\eBooster-Portable.exe -Algorithm SHA256).Hash.ToLower()
+            $newChecksums = "$setupHash  eBooster-Setup.exe`r`n$portableHash  eBooster-Portable.exe`r`n"
+            Set-Content -Path dist\checksums.txt -Value $newChecksums -Encoding ASCII
+            Write-Host "✓ Successfully signed binaries and updated checksums.txt!" -ForegroundColor Green
+          } finally {
+            if (Test-Path $certTemp) { Remove-Item $certTemp -Force -ErrorAction SilentlyContinue }
+          }
+
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -94,3 +128,13 @@ jobs:
             dist/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Submit to Windows Package Manager (Winget)
+        if: env.WINGET_TOKEN != ''
+        uses: vedantmgoyal2009/winget-releaser@v2
+        with:
+          identifier: anasx07.eBooster
+          installers-regex: 'eBooster-Setup\.exe$'
+          token: ${{ secrets.WINGET_TOKEN }}
+        env:
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
