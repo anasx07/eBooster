@@ -34,6 +34,7 @@ param (
     [string]$Bump = "",
     [string]$Title = "",
     [switch]$LocalBuild,
+    [switch]$NoPrompt,
     [string]$Repo = "anasx07/eBooster"
 )
 
@@ -255,7 +256,9 @@ Write-Host "  5. Publishes GitHub Release with both Installer & Portable assets!
 Write-Host "  6. All active eBooster client apps will auto-detect the update!" -ForegroundColor Magenta
 Write-Host "======================================================================`n" -ForegroundColor Cyan
 
-$openBrowser = Read-Host "Open GitHub Actions live build in browser? [Y/n] (default: Y)"
-if ($openBrowser -notmatch "^[nN]") {
-    Start-Process $actionsUrl
+if (-not $NoPrompt) {
+    $openBrowser = Read-Host "Open GitHub Actions live build in browser? [Y/n] (default: Y)"
+    if ($openBrowser -notmatch "^[nN]") {
+        Start-Process $actionsUrl
+    }
 }
