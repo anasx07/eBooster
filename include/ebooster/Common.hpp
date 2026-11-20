@@ -29,7 +29,7 @@
 
 namespace ebooster {
 
-inline constexpr const char* EBOOSTER_VERSION = "v1.0.0";
+inline constexpr const char* EBOOSTER_VERSION = "v1.0.1";
 
 // RAII Deleter for Win32 Kernel Handles (Process, Thread, Event, Mutex, File)
 struct WinHandleDeleter {
