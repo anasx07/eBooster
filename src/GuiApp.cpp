@@ -101,7 +101,7 @@ GuiApp::GuiApp() {
     m_currentJitter.store(CalculateCurrentJitter());
     m_currentPacketLoss.store(0.0f);
 
-    m_updateManager = std::make_unique<UpdateManager>("anas-r/eBooster", "v1.0.0");
+    m_updateManager = std::make_unique<UpdateManager>("anasx07/eBooster", EBOOSTER_VERSION);
 }
 
 GuiApp::~GuiApp() {
@@ -2974,7 +2974,7 @@ void GuiApp::RenderPageSettings() {
         SaveUserPreferences();
     }
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("GitHub owner/repo (e.g. anas-r/eBooster)");
+        ImGui::SetTooltip("GitHub owner/repo (e.g. anasx07/eBooster)");
     }
 
     ImGui::SameLine();
@@ -4450,7 +4450,7 @@ void GuiApp::LoadUserPreferences() {
         strncpy_s(m_githubRepoBuf, sizeof(m_githubRepoBuf), m_prefs.githubRepo.c_str(), _TRUNCATE);
     }
     if (!m_updateManager) {
-        m_updateManager = std::make_unique<UpdateManager>(m_prefs.githubRepo, "v1.0.0");
+        m_updateManager = std::make_unique<UpdateManager>(m_prefs.githubRepo, EBOOSTER_VERSION);
     } else {
         m_updateManager->SetRepository(m_prefs.githubRepo);
     }

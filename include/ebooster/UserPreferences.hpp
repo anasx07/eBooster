@@ -49,7 +49,7 @@ struct UserPreferences {
 
     // GitHub Software Updates
     bool autoCheckUpdates{true};
-    std::string githubRepo{"anas-r/eBooster"};
+    std::string githubRepo{"anasx07/eBooster"};
 };
 
 class PreferencesManager {
