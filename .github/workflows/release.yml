@@ -22,43 +22,23 @@ jobs:
       - name: Setup MSBuild and Visual Studio Tools
         uses: microsoft/setup-msbuild@v2
 
-      - name: Build and Package Release Bundle
+      - name: Build Standalone Executable
         shell: powershell
         run: |
           $versionTag = "${{ github.ref_name }}"
-          Write-Host "Building eBooster Release for tag: $versionTag" -ForegroundColor Cyan
+          Write-Host "Building standalone eBooster.exe for: $versionTag" -ForegroundColor Cyan
           
-          # Execute the automated release build script (MSVC standalone /MT)
+          # Execute the standalone release build script (MSVC standalone /MT)
           powershell -ExecutionPolicy Bypass -File scripts\build_release.ps1 -Version "$versionTag" -SkipMinGW
           
-          $distFolder = "dist\eBooster-$versionTag-Release"
-          $distExe = "$distFolder\eBooster.exe"
-          $distZip = "dist\eBooster-$versionTag-Release.zip"
-          
+          $distExe = "dist\eBooster.exe"
           if (-not (Test-Path $distExe)) {
             throw "Executable was not produced at: $distExe"
           }
-          if (-not (Test-Path $distZip)) {
-            throw "Release ZIP was not produced at: $distZip"
-          }
           
-          # Also stage a copy of eBooster.exe at root of dist for direct asset download
-          Copy-Item -Path $distExe -Destination "dist\eBooster.exe" -Force
-          
-          # Compute and display SHA256 hashes
-          $exeHash = (Get-FileHash -Path "dist\eBooster.exe" -Algorithm SHA256).Hash
-          $zipHash = (Get-FileHash -Path $distZip -Algorithm SHA256).Hash
-          
+          # Compute and display SHA256 hash
+          $exeHash = (Get-FileHash -Path $distExe -Algorithm SHA256).Hash
           Write-Host "eBooster.exe SHA256: $exeHash" -ForegroundColor Green
-          Write-Host "Release.zip  SHA256: $zipHash" -ForegroundColor Green
-          
-          # Write checksums file for release
-          $checksumsContent = @"
-          SHA-256 Checksums for eBooster $versionTag:
-          $exeHash  eBooster.exe
-          $zipHash  eBooster-$versionTag-Release.zip
-          "@
-          Set-Content -Path "dist\checksums.txt" -Value $checksumsContent -Encoding utf8
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -68,7 +48,5 @@ jobs:
           generate_release_notes: true
           files: |
             dist/eBooster.exe
-            dist/eBooster-${{ github.ref_name }}-Release.zip
-            dist/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

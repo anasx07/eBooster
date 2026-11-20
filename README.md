@@ -192,14 +192,13 @@ eBooster/
 
 ## ⚡ Quick Start & Installation
 
-### Option 1: Standalone Binary (Recommended)
-1. Download the latest release from the [GitHub Releases page](https://github.com/anasx07/eBooster/releases).
-2. Extract the archive into any folder (e.g., `C:\eBooster`).
-3. Run `eBooster.exe`.
+### Single Standalone Executable (Zero Setup)
+1. Download `eBooster.exe` directly from the [GitHub Releases page](https://github.com/anasx07/eBooster/releases).
+2. Run `eBooster.exe` anywhere (Desktop, Downloads, etc.) — **zero unzipping or installation required**.
    - The application automatically requests Administrator elevation via embedded manifest (required for WFP packet filters and registry pacing).
-4. Select your game profile (e.g. **eFootball [Steam]**).
-5. Activate the **Anti-Lag Shield** and pick your target dedicated server.
-6. Launch your game!
+3. Select your game profile (e.g. **eFootball [Steam]**).
+4. Activate the **Anti-Lag Shield** and pick your target dedicated server.
+5. Launch your game!
 
 ---
 
@@ -223,14 +222,13 @@ cmake --build build_msvc --config Release --parallel
 The compiled standalone binary will be located at:
 `build_msvc\Release\eBooster.exe` (1.9 MB, zero runtime dependencies).
 
-### 2. Build Release Package (One-Click)
-To automatically compile the binary, stage configuration files, and produce the distribution ZIP archive:
+### 2. Build Standalone Release Binary (One-Click)
+To automatically compile and stage the standalone executable into `dist/`:
 ```powershell
 powershell -ExecutionPolicy Bypass -File scripts\build_release.ps1 -Version "v1.0"
 ```
 Output:
-- Folder: `dist\eBooster-v1.0-Release\`
-- Archive: `dist\eBooster-v1.0-Release.zip` (~0.99 MB)
+- `dist\eBooster.exe` (1.9 MB standalone portable binary)
 
 ---
 
