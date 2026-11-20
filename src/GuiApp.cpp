@@ -115,6 +115,11 @@ bool GuiApp::Initialize(HINSTANCE hInstance, int nCmdShow) {
     // Load persisted user preferences from configs/user_preferences.json
     LoadUserPreferences();
 
+    HICON hAppIcon = LoadIconW(hInstance, MAKEINTRESOURCEW(1));
+    if (!hAppIcon) {
+        hAppIcon = LoadIconW(nullptr, IDI_APPLICATION);
+    }
+
     // Register Win32 Window Class
     WNDCLASSEXW wc = {
         sizeof(wc),
@@ -122,11 +127,11 @@ bool GuiApp::Initialize(HINSTANCE hInstance, int nCmdShow) {
         WndProc,
         0L, 0L,
         hInstance,
-        LoadIcon(nullptr, IDI_APPLICATION),
+        hAppIcon,
         LoadCursor(nullptr, IDC_ARROW),
         nullptr, nullptr,
         L"eBoosterMainWindowClass",
-        nullptr
+        hAppIcon
     };
     RegisterClassExW(&wc);
 
@@ -712,52 +717,53 @@ void GuiApp::SetupImGuiStyle() {
     style.ScaleAllSizes(m_dpiScale);
 
     ImVec4* colors = style.Colors;
-    colors[ImGuiCol_WindowBg]             = ImVec4(0.04f, 0.05f, 0.08f, 1.00f); // #0A0D14
-    colors[ImGuiCol_ChildBg]              = ImVec4(0.08f, 0.10f, 0.14f, 0.96f); // #141A24
-    colors[ImGuiCol_PopupBg]              = ImVec4(0.09f, 0.12f, 0.18f, 0.98f); // 100% Solid Opaque
-    colors[ImGuiCol_Border]               = ImVec4(0.18f, 0.22f, 0.30f, 0.65f); // Crisp metallic border
-    colors[ImGuiCol_BorderShadow]         = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
-    colors[ImGuiCol_ModalWindowDimBg]     = ImVec4(0.01f, 0.02f, 0.04f, 0.85f); // Rich dark modal backdrop
+    // Palette 2: eFootball Stadium Theme (Deep Midnight Navy, Electric Blue, Vivid Magenta)
+    colors[ImGuiCol_WindowBg]             = ImVec4(0.032f, 0.045f, 0.078f, 1.00f); // #080B14 - Deep Midnight Navy
+    colors[ImGuiCol_ChildBg]              = ImVec4(0.052f, 0.072f, 0.122f, 0.98f); // #0D121F - Stadium Card Surface
+    colors[ImGuiCol_PopupBg]              = ImVec4(0.060f, 0.082f, 0.138f, 1.00f); // #101523 - Solid Opaque Popup
+    colors[ImGuiCol_Border]               = ImVec4(0.000f, 0.640f, 1.000f, 0.28f); // Electric Blue Subtle Border Glow
+    colors[ImGuiCol_BorderShadow]         = ImVec4(0.000f, 0.000f, 0.000f, 0.000f);
+    colors[ImGuiCol_ModalWindowDimBg]     = ImVec4(0.015f, 0.022f, 0.040f, 0.88f); // Stadium Atmosphere Backdrop
 
-    colors[ImGuiCol_FrameBg]              = ImVec4(0.11f, 0.14f, 0.19f, 1.00f);
-    colors[ImGuiCol_FrameBgHovered]       = ImVec4(0.16f, 0.20f, 0.28f, 1.00f);
-    colors[ImGuiCol_FrameBgActive]        = ImVec4(0.20f, 0.25f, 0.35f, 1.00f);
+    colors[ImGuiCol_FrameBg]              = ImVec4(0.075f, 0.105f, 0.170f, 1.00f); // #131B2B
+    colors[ImGuiCol_FrameBgHovered]       = ImVec4(0.110f, 0.150f, 0.245f, 1.00f);
+    colors[ImGuiCol_FrameBgActive]        = ImVec4(0.145f, 0.200f, 0.320f, 1.00f);
 
-    // Accent colors: Cyan & Emerald
-    colors[ImGuiCol_TitleBg]              = ImVec4(0.05f, 0.07f, 0.10f, 1.00f);
-    colors[ImGuiCol_TitleBgActive]        = ImVec4(0.05f, 0.07f, 0.10f, 1.00f);
-    colors[ImGuiCol_MenuBarBg]            = ImVec4(0.07f, 0.09f, 0.12f, 1.00f);
+    // Accents: Electric Blue & Vivid Magenta
+    colors[ImGuiCol_TitleBg]              = ImVec4(0.040f, 0.058f, 0.098f, 1.00f);
+    colors[ImGuiCol_TitleBgActive]        = ImVec4(0.040f, 0.058f, 0.098f, 1.00f);
+    colors[ImGuiCol_MenuBarBg]            = ImVec4(0.048f, 0.068f, 0.112f, 1.00f);
 
-    colors[ImGuiCol_ScrollbarBg]          = ImVec4(0.04f, 0.06f, 0.08f, 0.50f);
-    colors[ImGuiCol_ScrollbarGrab]        = ImVec4(0.18f, 0.22f, 0.30f, 1.00f);
-    colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.26f, 0.32f, 0.44f, 1.00f);
-    colors[ImGuiCol_ScrollbarGrabActive]  = ImVec4(0.00f, 0.85f, 1.00f, 1.00f);
+    colors[ImGuiCol_ScrollbarBg]          = ImVec4(0.030f, 0.042f, 0.070f, 0.55f);
+    colors[ImGuiCol_ScrollbarGrab]        = ImVec4(0.100f, 0.150f, 0.240f, 1.00f);
+    colors[ImGuiCol_ScrollbarGrabHovered] = ImVec4(0.000f, 0.640f, 1.000f, 0.70f);
+    colors[ImGuiCol_ScrollbarGrabActive]  = ImVec4(1.000f, 0.000f, 0.500f, 0.90f); // Vivid Magenta
 
-    colors[ImGuiCol_CheckMark]            = ImVec4(0.00f, 0.95f, 0.60f, 1.00f);
-    colors[ImGuiCol_SliderGrab]           = ImVec4(0.00f, 0.85f, 1.00f, 1.00f);
-    colors[ImGuiCol_SliderGrabActive]     = ImVec4(0.00f, 1.00f, 0.80f, 1.00f);
+    colors[ImGuiCol_CheckMark]            = ImVec4(0.000f, 0.850f, 1.000f, 1.00f); // Electric Cyan-Blue
+    colors[ImGuiCol_SliderGrab]           = ImVec4(0.000f, 0.640f, 1.000f, 1.00f);
+    colors[ImGuiCol_SliderGrabActive]     = ImVec4(1.000f, 0.000f, 0.500f, 1.00f); // Vivid Magenta
 
-    colors[ImGuiCol_Button]               = ImVec4(0.12f, 0.16f, 0.22f, 1.00f);
-    colors[ImGuiCol_ButtonHovered]        = ImVec4(0.18f, 0.24f, 0.34f, 1.00f);
-    colors[ImGuiCol_ButtonActive]         = ImVec4(0.00f, 0.70f, 0.95f, 1.00f);
+    colors[ImGuiCol_Button]               = ImVec4(0.065f, 0.160f, 0.290f, 0.85f); // Electric Navy
+    colors[ImGuiCol_ButtonHovered]        = ImVec4(0.000f, 0.550f, 0.920f, 0.90f); // Bright Electric Blue
+    colors[ImGuiCol_ButtonActive]         = ImVec4(0.000f, 0.640f, 1.000f, 1.00f);
 
-    colors[ImGuiCol_Header]               = ImVec4(0.14f, 0.18f, 0.25f, 1.00f);
-    colors[ImGuiCol_HeaderHovered]        = ImVec4(0.20f, 0.26f, 0.36f, 1.00f);
-    colors[ImGuiCol_HeaderActive]         = ImVec4(0.00f, 0.80f, 1.00f, 1.00f);
+    colors[ImGuiCol_Header]               = ImVec4(0.075f, 0.145f, 0.250f, 0.85f);
+    colors[ImGuiCol_HeaderHovered]        = ImVec4(0.000f, 0.500f, 0.850f, 0.60f);
+    colors[ImGuiCol_HeaderActive]         = ImVec4(0.000f, 0.640f, 1.000f, 0.95f);
 
-    colors[ImGuiCol_Separator]            = ImVec4(0.15f, 0.18f, 0.25f, 0.70f);
-    colors[ImGuiCol_SeparatorHovered]     = ImVec4(0.00f, 0.85f, 1.00f, 0.80f);
-    colors[ImGuiCol_SeparatorActive]      = ImVec4(0.00f, 0.85f, 1.00f, 1.00f);
+    colors[ImGuiCol_Separator]            = ImVec4(0.000f, 0.640f, 1.000f, 0.22f);
+    colors[ImGuiCol_SeparatorHovered]     = ImVec4(0.000f, 0.850f, 1.000f, 0.80f);
+    colors[ImGuiCol_SeparatorActive]      = ImVec4(1.000f, 0.000f, 0.500f, 1.00f); // Magenta separator accent
 
     colors[ImGuiCol_ResizeGrip]           = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
     colors[ImGuiCol_ResizeGripHovered]    = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
     colors[ImGuiCol_ResizeGripActive]     = ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
 
-    colors[ImGuiCol_PlotLines]            = ImVec4(0.00f, 0.85f, 1.00f, 1.00f);
-    colors[ImGuiCol_PlotLinesHovered]     = ImVec4(0.00f, 0.95f, 0.55f, 1.00f);
+    colors[ImGuiCol_PlotLines]            = ImVec4(0.000f, 0.720f, 1.000f, 1.00f); // Electric Blue Ping
+    colors[ImGuiCol_PlotLinesHovered]     = ImVec4(1.000f, 0.000f, 0.500f, 1.00f); // Vivid Magenta Peak
 
-    colors[ImGuiCol_Text]                 = ImVec4(0.94f, 0.96f, 0.98f, 1.00f);
-    colors[ImGuiCol_TextDisabled]         = ImVec4(0.45f, 0.50f, 0.60f, 1.00f);
+    colors[ImGuiCol_Text]                 = ImVec4(0.930f, 0.955f, 0.990f, 1.00f);
+    colors[ImGuiCol_TextDisabled]         = ImVec4(0.440f, 0.520f, 0.660f, 1.00f);
 }
 
 void GuiApp::UpdateDpiScale() {
@@ -845,37 +851,37 @@ void GuiApp::RenderTopBar() {
     ImVec2 screenPos = ImGui::GetCursorScreenPos();
     float topBarH = S(48.0f);
 
-    // Subtle dark gradient background for topbar
+    // Subtle deep midnight navy gradient background for topbar
     draw->AddRectFilledMultiColor(
         screenPos,
         ImVec2(screenPos.x + io.DisplaySize.x, screenPos.y + topBarH),
-        IM_COL32(10, 13, 19, 255), IM_COL32(10, 13, 19, 255),
-        IM_COL32(14, 18, 26, 255), IM_COL32(14, 18, 26, 255)
+        IM_COL32(8, 11, 20, 255), IM_COL32(8, 11, 20, 255),
+        IM_COL32(13, 18, 32, 255), IM_COL32(13, 18, 32, 255)
     );
     draw->AddLine(
         ImVec2(screenPos.x, screenPos.y + topBarH),
         ImVec2(screenPos.x + io.DisplaySize.x, screenPos.y + topBarH),
-        IM_COL32(28, 36, 50, 200), 1.0f
+        IM_COL32(0, 163, 255, 65), 1.0f
     );
 
-    // Left Brand Logo & Title with PRO Pill
+    // Left Brand Logo & Title with PRO Pill (Concept C: Radar Reticle / Target Lock)
     ImGui::SetCursorPos(ImVec2(S(18.0f), S(12.0f)));
-    ImGui::TextColored(ImVec4(0.00f, 0.90f, 1.00f, 1.0f), ICON_FA_BOLT "  eBOOSTER");
+    ImGui::TextColored(ImVec4(0.00f, 0.65f, 1.00f, 1.0f), ICON_FA_CROSSHAIRS "  eBOOSTER");
     ImGui::SameLine();
 
-    // Sleek PRO Pill
+    // Sleek PRO Pill in Vivid eFootball Magenta
     ImVec2 pPill = ImGui::GetCursorScreenPos();
     draw->AddRectFilled(
         ImVec2(pPill.x - S(2.0f), pPill.y + S(2.0f)),
         ImVec2(pPill.x + S(36.0f), pPill.y + S(19.0f)),
-        IM_COL32(0, 180, 255, 45), 4.0f
+        IM_COL32(255, 0, 127, 45), 4.0f
     );
     draw->AddRect(
         ImVec2(pPill.x - S(2.0f), pPill.y + S(2.0f)),
         ImVec2(pPill.x + S(36.0f), pPill.y + S(19.0f)),
-        IM_COL32(0, 220, 255, 120), 4.0f
+        IM_COL32(255, 0, 127, 180), 4.0f
     );
-    draw->AddText(ImVec2(pPill.x + S(4.0f), pPill.y + S(3.0f)), IM_COL32(0, 230, 255, 255), "PRO");
+    draw->AddText(ImVec2(pPill.x + S(4.0f), pPill.y + S(3.0f)), IM_COL32(255, 60, 160, 255), "PRO");
 
     ImGui::SetCursorPosX(ImGui::GetCursorPosX() + S(42.0f));
     ImGui::TextColored(ImVec4(0.40f, 0.46f, 0.58f, 1.0f), "eFootball Dedicated Server Optimizer");
@@ -1025,13 +1031,13 @@ void GuiApp::RenderSidebar() {
         ImGui::SetCursorPosX(S(12.0f));
 
         if (isSelected) {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.00f, 0.50f, 0.90f, 0.22f));
-            ImGui::PushStyleColor(ImGuiCol_Text,   ImVec4(0.00f, 0.92f, 1.00f, 1.00f));
-            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.00f, 0.85f, 1.00f, 0.75f));
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.00f, 0.45f, 0.85f, 0.25f));
+            ImGui::PushStyleColor(ImGuiCol_Text,   ImVec4(0.00f, 0.75f, 1.00f, 1.00f));
+            ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.00f, 0.64f, 1.00f, 0.70f));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
         } else {
-            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.10f, 0.12f, 0.17f, 0.50f));
-            ImGui::PushStyleColor(ImGuiCol_Text,   ImVec4(0.75f, 0.80f, 0.88f, 1.00f));
+            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.06f, 0.09f, 0.15f, 0.60f));
+            ImGui::PushStyleColor(ImGuiCol_Text,   ImVec4(0.68f, 0.76f, 0.88f, 1.00f));
             ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0, 0, 0, 0));
             ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
         }
@@ -1041,12 +1047,12 @@ void GuiApp::RenderSidebar() {
             m_currentPage = page;
         }
 
-        // Active indicator line on the left
+        // Active indicator line on the left in Electric Blue
         if (isSelected) {
             ImGui::GetWindowDrawList()->AddRectFilled(
                 pBefore,
                 ImVec2(pBefore.x + S(3.5f), pBefore.y + S(42.0f)),
-                IM_COL32(0, 240, 255, 255), 2.0f
+                IM_COL32(0, 163, 255, 255), 2.0f
             );
         }
 
@@ -3606,7 +3612,8 @@ void GuiApp::InitTrayIcon() {
     m_nid.uID = 1;
     m_nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP;
     m_nid.uCallbackMessage = WM_TRAYICON;
-    m_nid.hIcon = LoadIconW(GetModuleHandleW(nullptr), IDI_APPLICATION);
+    HICON hTrayIcon = LoadIconW(GetModuleHandleW(nullptr), MAKEINTRESOURCEW(1));
+    m_nid.hIcon = hTrayIcon ? hTrayIcon : LoadIconW(nullptr, IDI_APPLICATION);
 
     std::wstring tip = L"eBooster Pro - Low Latency Game Relay (Standby)";
     wcsncpy_s(m_nid.szTip, tip.c_str(), _TRUNCATE);
