@@ -38,3 +38,8 @@ tools/
 *.log
 *.tmp
 *.bak
+
+# Secrets & GitHub release tokens
+.github_token
+*.secret
+.env

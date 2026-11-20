@@ -20,5 +20,7 @@
   "ispBenchmarkIp": "185.60.112.157",
   "selectedKonamiRegion": 0,
   "efootballGeofilterActive": false,
-  "efootballAntiLagShield": false
+  "efootballAntiLagShield": false,
+  "autoCheckUpdates": true,
+  "githubRepo": "anasx07/eBooster"
 }

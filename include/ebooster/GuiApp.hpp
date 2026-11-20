@@ -282,7 +282,7 @@ private:
 
     // Software Updates via GitHub Releases
     std::unique_ptr<UpdateManager> m_updateManager;
-    char m_githubRepoBuf[128]{"anas-r/eBooster"};
+    char m_githubRepoBuf[128]{"anasx07/eBooster"};
     bool m_showUpdateModal{false};
     bool m_hasCheckedUpdateOnLaunch{false};
 

@@ -4,7 +4,7 @@
 [![C++ Standard](https://img.shields.io/badge/C%2B%2B-23-purple.svg?style=flat-square&logo=c%2B%2B)](https://en.cppreference.com/w/cpp/23)
 [![DirectX](https://img.shields.io/badge/GUI-DirectX%2011%20%2B%20Dear%20ImGui-0078d7.svg?style=flat-square)](https://github.com/ocornut/imgui)
 [![Anti-Cheat](https://img.shields.io/badge/Anti--Cheat-100%25%20Safe%20(Pure%20WFP)-brightgreen.svg?style=flat-square)](#-anti-cheat-safety-guarantee)
-[![GitHub Release](https://img.shields.io/github/v/release/anas-r/eBooster?style=flat-square&color=orange)](https://github.com/anas-r/eBooster/releases)
+[![GitHub Release](https://img.shields.io/github/v/release/anasx07/eBooster?style=flat-square&color=orange)](https://github.com/anasx07/eBooster/releases)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
 
 **eBooster Pro** is an open-source, ultra-low-latency Windows desktop game optimization engine and dedicated server region lock engineered in **Modern C++23**.
@@ -193,7 +193,7 @@ eBooster/
 ## ⚡ Quick Start & Installation
 
 ### Option 1: Standalone Binary (Recommended)
-1. Download the latest release from the [GitHub Releases page](https://github.com/anas-r/eBooster/releases).
+1. Download the latest release from the [GitHub Releases page](https://github.com/anasx07/eBooster/releases).
 2. Extract the archive into any folder (e.g., `C:\eBooster`).
 3. Run `eBooster.exe`.
    - The application automatically requests Administrator elevation via embedded manifest (required for WFP packet filters and registry pacing).
@@ -241,23 +241,26 @@ Output:
 - Clicking **Download & Install** downloads the new standalone binary with a live progress bar.
 - Clicking **Restart & Install** swaps the executable instantly and restarts into the new version—no re-installation needed.
 
-### For Maintainers (Publishing a New Version):
-1. **Update Version**: Set the version in `CMakeLists.txt` (e.g., `project(eBooster VERSION 1.1.0 LANGUAGES CXX)`).
-2. **Build Distribution Package**:
-   ```powershell
-   powershell -ExecutionPolicy Bypass -File scripts\build_release.ps1 -Version "v1.1.0"
-   ```
-3. **Push Tag to GitHub**:
-   ```bash
-   git tag -a v1.1.0 -m "Release v1.1.0"
-   git push origin v1.1.0
-   ```
-4. **Create a GitHub Release**:
-   - Go to your repository's **Releases** > **Draft a new release**.
-   - Select tag `v1.1.0`.
-   - Upload `dist\eBooster-v1.1.0-Release\eBooster.exe` (and optionally `eBooster-v1.1.0-Release.zip`).
-   - Publish the release.
-5. All eBooster clients will automatically detect the new release tag, fetch release notes, and offer an in-app update!
+### For Maintainers (Automated One-Click Release CLI):
+eBooster includes a dedicated Release CLI tool that automates the entire version bump, compilation, tagging, and GitHub publishing process:
+
+```powershell
+# Interactive wizard (prompts for version bump, title, and changelog)
+.\release.bat
+
+# Or direct command-line bump:
+.\release.bat -Bump patch                  # e.g. v1.0.0 -> v1.0.1
+.\release.bat -Bump minor                  # e.g. v1.0.0 -> v1.1.0
+.\release.bat -Version "v1.2.0" -Title "eBooster v1.2.0" -Notes "Major update"
+```
+
+The CLI automatically:
+1. Updates `CMakeLists.txt` and C++ `EBOOSTER_VERSION` headers.
+2. Builds the standalone Visual Studio MSVC binary (`/MT`).
+3. Creates the distribution ZIP package in `dist/`.
+4. Commits, tags, and pushes to `origin/main --tags`.
+5. Publishes the release to GitHub and uploads `eBooster.exe` (via GitHub CLI, GitHub Personal Access Token, or automated browser draft).
+6. All existing client apps instantly receive the update notification!
 
 ---
 

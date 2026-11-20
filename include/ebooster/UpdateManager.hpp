@@ -15,7 +15,7 @@ namespace ebooster {
 
 struct UpdateInfo {
     bool available{false};
-    std::string currentVersion{"v1.0.0"};
+    std::string currentVersion{EBOOSTER_VERSION};
     std::string latestVersion;
     std::string releaseTitle;
     std::string releaseNotes;
@@ -37,7 +37,7 @@ enum class UpdateState {
 
 class UpdateManager {
 public:
-    explicit UpdateManager(std::string githubRepo = "anas-r/eBooster", std::string currentVersion = "v1.0.0");
+    explicit UpdateManager(std::string githubRepo = "anasx07/eBooster", std::string currentVersion = EBOOSTER_VERSION);
     ~UpdateManager();
 
     // Configuration
