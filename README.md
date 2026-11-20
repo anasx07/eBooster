@@ -5,6 +5,7 @@
 [![DirectX](https://img.shields.io/badge/GUI-DirectX%2011%20%2B%20Dear%20ImGui-0078d7.svg?style=flat-square)](https://github.com/ocornut/imgui)
 [![Anti-Cheat](https://img.shields.io/badge/Anti--Cheat-100%25%20Safe%20(Pure%20WFP)-brightgreen.svg?style=flat-square)](#-anti-cheat-safety-guarantee)
 [![GitHub Release](https://img.shields.io/github/v/release/anasx07/eBooster?style=flat-square&color=orange)](https://github.com/anasx07/eBooster/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/anasx07/eBooster/ci.yml?branch=main&label=CI&style=flat-square&logo=githubactions)](https://github.com/anasx07/eBooster/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-MIT-green.svg?style=flat-square)](LICENSE)
 
 **eBooster Pro** is an open-source, ultra-low-latency Windows desktop game optimization engine and dedicated server region lock engineered in **Modern C++23**.

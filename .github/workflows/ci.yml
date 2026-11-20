@@ -1,0 +1,53 @@
+name: Continuous Integration (CI)
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-verify:
+    name: Build & Verify (Windows MSVC Release)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild and Visual Studio Tools
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Configure CMake
+        shell: powershell
+        run: |
+          cmake -B build_msvc -S .
+
+      - name: Compile Standalone Release Binary
+        shell: powershell
+        run: |
+          cmake --build build_msvc --config Release --parallel
+
+      - name: Verify Build Output
+        shell: powershell
+        run: |
+          $exe = "build_msvc\Release\eBooster.exe"
+          if (-not (Test-Path $exe)) {
+            throw "Executable was not produced at: $exe"
+          }
+          $hash = (Get-FileHash $exe -Algorithm SHA256).Hash
+          $sizeMB = [math]::Round((Get-Item $exe).Length / 1MB, 2)
+          Write-Host "CI Build Verification Successful!" -ForegroundColor Green
+          Write-Host "Binary : $exe ($sizeMB MB)" -ForegroundColor Cyan
+          Write-Host "SHA256 : $hash" -ForegroundColor Gray
