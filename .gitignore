@@ -1,0 +1,40 @@
+# Build directories
+build/
+build_mingw/
+build_msvc/
+dist/
+cache/
+bin/
+out/
+
+# Visual Studio / IDE files
+.vs/
+.vscode/
+*.user
+*.suo
+*.sln.docstates
+
+# Compiled binaries and objects
+*.obj
+*.o
+*.lib
+*.a
+*.pdb
+*.ilk
+*.exe
+*.dll
+
+# Archives & Shortcuts
+*.zip
+*.7z
+*.tar.gz
+*.rar
+*.lnk
+
+# Local tools and reference dumps
+tools/
+
+# Logs & temp files
+*.log
+*.tmp
+*.bak
