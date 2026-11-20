@@ -304,7 +304,7 @@ void SteamDetector::ResolveGameArt(DetectedSteamGame& game, const std::filesyste
 std::string SteamDetector::DownloadCdnBanner(uint32_t appId) {
     if (appId == 0) return "";
 
-    std::filesystem::path cacheDir = std::filesystem::path("cache/steam") / std::to_string(appId);
+    std::filesystem::path cacheDir = GetAppCacheDir() / "steam" / std::to_string(appId);
     try {
         std::filesystem::create_directories(cacheDir);
     } catch (...) {

@@ -15,6 +15,8 @@
 #include <icmpapi.h>
 #include <netioapi.h>
 #include <tlhelp32.h>
+#include <shlobj.h>
+#include <shellapi.h>
 
 #include <string>
 #include <string_view>
@@ -177,6 +179,10 @@ std::optional<uint32_t> PingHost(const std::string& ipAddress, uint32_t timeoutM
 
 // Path resolution helpers
 std::filesystem::path GetExecutableDir();
+std::filesystem::path GetAppDataDir();
+std::filesystem::path GetAppCacheDir();
 std::filesystem::path ResolveConfigPath(const std::filesystem::path& relPath);
+bool OpenFolderInExplorer(const std::filesystem::path& path);
+bool IsPortableMode();
 
 } // namespace ebooster

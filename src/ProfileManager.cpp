@@ -317,16 +317,17 @@ std::vector<GameProfile> ProfileManager::GetDefaultProfiles() {
 }
 
 std::vector<GameProfile> ProfileManager::LoadProfiles(const std::filesystem::path& configPath) {
-    if (std::filesystem::exists(configPath)) {
+    std::filesystem::path actualPath = configPath.empty() ? ResolveConfigPath("configs/profiles.json") : configPath;
+    if (std::filesystem::exists(actualPath)) {
         try {
-            std::ifstream file(configPath, std::ios::in | std::ios::binary);
+            std::ifstream file(actualPath, std::ios::in | std::ios::binary);
             if (file.is_open()) {
                 std::stringstream ss;
                 ss << file.rdbuf();
                 std::string content = ss.str();
                 auto parsed = ParseProfilesJson(content);
                 if (!parsed.empty()) {
-                    LogFmt(LogLevel::Info, "Loaded {} game profile(s) from '{}'", parsed.size(), configPath.string());
+                    LogFmt(LogLevel::Info, "Loaded {} game profile(s) from '{}'", parsed.size(), actualPath.string());
                     return parsed;
                 }
 
@@ -334,31 +335,32 @@ std::vector<GameProfile> ProfileManager::LoadProfiles(const std::filesystem::pat
                 if (!content.empty() && content.find_first_not_of(" \t\r\n") != std::string::npos) {
                     auto now = std::chrono::duration_cast<std::chrono::seconds>(
                         std::chrono::system_clock::now().time_since_epoch()).count();
-                    std::filesystem::path bakPath = configPath;
+                    std::filesystem::path bakPath = actualPath;
                     bakPath += std::format(".corrupt.{}.bak", now);
                     std::error_code ec;
-                    std::filesystem::copy_file(configPath, bakPath, std::filesystem::copy_options::overwrite_existing, ec);
+                    std::filesystem::copy_file(actualPath, bakPath, std::filesystem::copy_options::overwrite_existing, ec);
                     LogFmt(LogLevel::Error, "Syntax error in profiles '{}'. Backed up to '{}'. Preserving user file.",
-                           configPath.string(), bakPath.string());
+                           actualPath.string(), bakPath.string());
                     return GetDefaultProfiles();
                 }
             }
         } catch (const std::exception& e) {
             LogFmt(LogLevel::Warn, "Error reading profiles from '{}': {}. Falling back to default profiles.",
-                   configPath.string(), e.what());
+                   actualPath.string(), e.what());
         }
     }
 
     // Only if file does NOT exist: generate defaults and save
     auto defaults = GetDefaultProfiles();
-    SaveProfiles(configPath, defaults);
+    SaveProfiles(actualPath, defaults);
     return defaults;
 }
 
 bool ProfileManager::SaveProfiles(const std::filesystem::path& configPath, const std::vector<GameProfile>& profiles) {
+    std::filesystem::path actualPath = configPath.empty() ? ResolveConfigPath("configs/profiles.json") : configPath;
     try {
-        if (configPath.has_parent_path()) {
-            std::filesystem::create_directories(configPath.parent_path());
+        if (actualPath.has_parent_path()) {
+            std::filesystem::create_directories(actualPath.parent_path());
         }
 
         std::string out = "[\n";
@@ -400,7 +402,7 @@ bool ProfileManager::SaveProfiles(const std::filesystem::path& configPath, const
         out += "]\n";
 
         // Atomic file write: write to .tmp then rename
-        std::filesystem::path tmpPath = configPath;
+        std::filesystem::path tmpPath = actualPath;
         tmpPath += ".tmp";
 
         std::ofstream file(tmpPath, std::ios::out | std::ios::trunc | std::ios::binary);
@@ -409,18 +411,18 @@ bool ProfileManager::SaveProfiles(const std::filesystem::path& configPath, const
             file.close();
 
             std::error_code ec;
-            std::filesystem::rename(tmpPath, configPath, ec);
+            std::filesystem::rename(tmpPath, actualPath, ec);
             if (ec) {
                 // If rename fails (e.g. Windows file lock), fallback to copy + remove
-                std::filesystem::copy_file(tmpPath, configPath, std::filesystem::copy_options::overwrite_existing, ec);
+                std::filesystem::copy_file(tmpPath, actualPath, std::filesystem::copy_options::overwrite_existing, ec);
                 std::filesystem::remove(tmpPath, ec);
             }
 
-            LogFmt(LogLevel::Info, "Saved {} game profile(s) to '{}'", profiles.size(), configPath.string());
+            LogFmt(LogLevel::Info, "Saved {} game profile(s) to '{}'", profiles.size(), actualPath.string());
             return true;
         }
     } catch (const std::exception& e) {
-        LogFmt(LogLevel::Error, "Failed to save game profiles to '{}': {}", configPath.string(), e.what());
+        LogFmt(LogLevel::Error, "Failed to save game profiles to '{}': {}", actualPath.string(), e.what());
     }
 
     return false;

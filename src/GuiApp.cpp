@@ -225,6 +225,10 @@ bool GuiApp::Initialize(HINSTANCE hInstance, int nCmdShow) {
     ImGuiIO& io = ImGui::GetIO();
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
+    // Direct ImGui window state persistence to %LOCALAPPDATA%\eBooster\imgui.ini
+    static std::string s_imguiIniPath = (GetAppDataDir() / "imgui.ini").string();
+    io.IniFilename = s_imguiIniPath.c_str();
+
     // Load High-DPI crisp base typography: Windows Segoe UI
     float baseFontSize = std::round(16.5f * m_dpiScale);
     float iconFontSize = std::round(14.0f * m_dpiScale);
@@ -2811,7 +2815,7 @@ void GuiApp::RenderPageSettings() {
 
     ImGui::Dummy(ImVec2(0, 8));
     if (ImGui::Button(ICON_FA_FOLDER_OPEN "  Open Configs Folder", ImVec2(220, 32))) {
-        ShellExecuteW(nullptr, L"open", L"configs", nullptr, nullptr, SW_SHOW);
+        OpenFolderInExplorer(GetAppDataDir() / "configs");
     }
     ImGui::SameLine();
     if (ImGui::Button(ICON_FA_ROTATE "  Reload Profiles from Disk", ImVec2(240, 32))) {
@@ -2823,6 +2827,10 @@ void GuiApp::RenderPageSettings() {
     if (ImGui::Button(ICON_FA_MAGNIFYING_GLASS "  Scan Steam & Fetch Art", ImVec2(240, 32))) {
         ScanSteamGames(true);
     }
+    ImGui::Dummy(ImVec2(0, 4));
+    ImGui::TextColored(ImVec4(0.35f, 0.45f, 0.60f, 1.0f), "%s Active Storage: %s",
+                       IsPortableMode() ? "[Portable Mode]" : "[AppData Mode]",
+                       (GetAppDataDir() / "configs").string().c_str());
 
     ImGui::Dummy(ImVec2(0, 16));
     ImGui::Separator();

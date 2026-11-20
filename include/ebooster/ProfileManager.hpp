@@ -25,7 +25,7 @@ public:
     static std::vector<GameProfile> GetDefaultProfiles();
 
     // Loads profiles from configs/profiles.json. If file missing, creates it with defaults.
-    static std::vector<GameProfile> LoadProfiles(const std::filesystem::path& configPath = "configs/profiles.json");
+    static std::vector<GameProfile> LoadProfiles(const std::filesystem::path& configPath = {});
 
     // Saves profile list to JSON file with clean indentation
     static bool SaveProfiles(const std::filesystem::path& configPath, const std::vector<GameProfile>& profiles);

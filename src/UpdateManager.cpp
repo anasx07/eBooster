@@ -502,7 +502,10 @@ void UpdateManager::DownloadUpdateAsync(std::function<void(bool success)> onComp
             m_totalBytes.store(contentLength);
         }
 
-        std::filesystem::path targetFile = GetExecutableDir() / "eBooster_update.exe";
+        auto updateDir = GetAppDataDir() / "updates";
+        std::error_code ecDir;
+        std::filesystem::create_directories(updateDir, ecDir);
+        std::filesystem::path targetFile = updateDir / "eBooster_update.exe";
         std::ofstream outFile(targetFile, std::ios::binary | std::ios::trunc);
         if (!outFile.is_open()) {
             std::lock_guard<std::mutex> lock(m_mutex);
@@ -574,11 +577,11 @@ bool UpdateManager::ApplyUpdateAndRestart() {
     GetModuleFileNameW(nullptr, currentExe, MAX_PATH);
 
     std::filesystem::path curPath = currentExe;
-    std::filesystem::path updatePath = GetExecutableDir() / "eBooster_update.exe";
-    std::filesystem::path oldPath = GetExecutableDir() / "eBooster.old.exe";
+    std::filesystem::path updatePath = GetAppDataDir() / "updates" / "eBooster_update.exe";
+    std::filesystem::path oldPath = curPath.parent_path() / (curPath.stem().string() + ".old.exe");
 
     if (!std::filesystem::exists(updatePath)) {
-        Log(LogLevel::Error, "Cannot apply update: eBooster_update.exe does not exist.");
+        Log(LogLevel::Error, "Cannot apply update: eBooster_update.exe does not exist in updates cache.");
         return false;
     }
 
@@ -593,11 +596,15 @@ bool UpdateManager::ApplyUpdateAndRestart() {
         return false;
     }
 
-    if (!MoveFileW(updatePath.c_str(), curPath.c_str())) {
-        LogFmt(LogLevel::Error, "MoveFileW new binary failed (Win32 Error: {}). Rolling back...", GetLastError());
+    // Copy new binary into curPath (works across drives/volumes)
+    if (!CopyFileW(updatePath.c_str(), curPath.c_str(), FALSE)) {
+        LogFmt(LogLevel::Error, "CopyFileW new binary failed (Win32 Error: {}). Rolling back...", GetLastError());
         MoveFileW(oldPath.c_str(), curPath.c_str());
         return false;
     }
+
+    // Clean up cached update binary
+    std::filesystem::remove(updatePath, ec);
 
     Log(LogLevel::Success, "⚡ Update applied cleanly! Spawning new eBooster instance and restarting...");
 
@@ -614,8 +621,11 @@ bool UpdateManager::ApplyUpdateAndRestart() {
 }
 
 void UpdateManager::CleanupOldExecutable() {
+    wchar_t currentExe[MAX_PATH] = {0};
+    GetModuleFileNameW(nullptr, currentExe, MAX_PATH);
+    std::filesystem::path curPath = currentExe;
+    std::filesystem::path oldFile = curPath.parent_path() / (curPath.stem().string() + ".old.exe");
     std::error_code ec;
-    std::filesystem::path oldFile = GetExecutableDir() / "eBooster.old.exe";
     if (std::filesystem::exists(oldFile, ec)) {
         std::filesystem::remove(oldFile, ec);
     }

@@ -54,7 +54,7 @@ struct UserPreferences {
 
 class PreferencesManager {
 public:
-    static UserPreferences Load(const std::filesystem::path& path);
+    static UserPreferences Load(const std::filesystem::path& path = {});
     static bool Save(const std::filesystem::path& path, const UserPreferences& prefs);
 };
 

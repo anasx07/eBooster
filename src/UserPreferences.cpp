@@ -93,13 +93,14 @@ bool ExtractUintValue(const std::string& json, const std::string& key, uint32_t&
 } // anonymous namespace
 
 UserPreferences PreferencesManager::Load(const std::filesystem::path& path) {
+    std::filesystem::path actualPath = path.empty() ? ResolveConfigPath("configs/user_preferences.json") : path;
     UserPreferences prefs{};
-    if (!std::filesystem::exists(path)) {
+    if (!std::filesystem::exists(actualPath)) {
         return prefs;
     }
 
     try {
-        std::ifstream file(path);
+        std::ifstream file(actualPath);
         if (!file.is_open()) return prefs;
 
         std::string json((std::istreambuf_iterator<char>(file)),
@@ -149,12 +150,13 @@ UserPreferences PreferencesManager::Load(const std::filesystem::path& path) {
 }
 
 bool PreferencesManager::Save(const std::filesystem::path& path, const UserPreferences& prefs) {
+    std::filesystem::path actualPath = path.empty() ? ResolveConfigPath("configs/user_preferences.json") : path;
     try {
-        if (path.has_parent_path()) {
-            std::filesystem::create_directories(path.parent_path());
+        if (actualPath.has_parent_path()) {
+            std::filesystem::create_directories(actualPath.parent_path());
         }
 
-        std::filesystem::path tmpPath = path;
+        std::filesystem::path tmpPath = actualPath;
         tmpPath += ".tmp";
 
         std::ofstream file(tmpPath, std::ios::trunc | std::ios::binary);
@@ -195,9 +197,9 @@ bool PreferencesManager::Save(const std::filesystem::path& path, const UserPrefe
         file.close();
 
         std::error_code ec;
-        std::filesystem::rename(tmpPath, path, ec);
+        std::filesystem::rename(tmpPath, actualPath, ec);
         if (ec) {
-            std::filesystem::copy_file(tmpPath, path, std::filesystem::copy_options::overwrite_existing, ec);
+            std::filesystem::copy_file(tmpPath, actualPath, std::filesystem::copy_options::overwrite_existing, ec);
             std::filesystem::remove(tmpPath, ec);
         }
 
