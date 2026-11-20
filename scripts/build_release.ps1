@@ -93,9 +93,11 @@ if (-not $SkipMSVC) {
             $msvcAvailable = $true
             Write-Host "      MSVC build successful: $msvcExe" -ForegroundColor Green
         } else {
+            if ($SkipMinGW) { throw "MSVC build failed (exit code $LASTEXITCODE)!" }
             Write-Host "      MSVC build skipped or failed. Continuing with MinGW." -ForegroundColor Yellow
         }
     } catch {
+        if ($SkipMinGW) { throw $_ }
         Write-Host "      MSVC build skipped ($($_.Exception.Message)). Continuing with MinGW." -ForegroundColor Yellow
     }
 }
