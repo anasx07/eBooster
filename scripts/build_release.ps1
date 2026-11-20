@@ -100,35 +100,80 @@ if (-not $SkipMSVC) {
     }
 }
 
-# 4. Prepare Distribution Directory & Single Executable Output
+# 4. Prepare Distribution Directory, Standalone, Portable & Installer
 $distRootDir = Join-Path $RootDir "dist"
 $targetExe = Join-Path $distRootDir "eBooster.exe"
+$targetPortable = Join-Path $distRootDir "eBooster-Portable.exe"
+$targetSetup = Join-Path $distRootDir "eBooster-Setup.exe"
 
-Write-Host "`n[4/4] Staging standalone executable: $targetExe..." -ForegroundColor Cyan
+Write-Host "`n[4/4] Staging binaries and packaging distribution in: $distRootDir..." -ForegroundColor Cyan
 
 if (-not (Test-Path $distRootDir)) {
     New-Item -ItemType Directory -Path $distRootDir -Force | Out-Null
 }
 
-# If eBooster.exe is in use by an active process, rename it out of the way first
-if (Test-Path $targetExe) {
-    try {
-        Remove-Item -Path $targetExe -Force -ErrorAction Stop
-    } catch {
-        $tmpRenamed = Join-Path $distRootDir "eBooster.locked.$([System.Guid]::NewGuid().ToString('N').Substring(0,8)).tmp"
-        Rename-Item -Path $targetExe -NewName (Split-Path $tmpRenamed -Leaf) -Force -ErrorAction SilentlyContinue
+# If files are locked, handle gracefully
+foreach ($f in @($targetExe, $targetPortable)) {
+    if (Test-Path $f) {
+        try {
+            Remove-Item -Path $f -Force -ErrorAction Stop
+        } catch {
+            $tmpRenamed = Join-Path $distRootDir "$((Get-Item $f).BaseName).locked.$([System.Guid]::NewGuid().ToString('N').Substring(0,8)).tmp"
+            Rename-Item -Path $f -NewName (Split-Path $tmpRenamed -Leaf) -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
-# Copy Visual Studio (MSVC) binary as primary eBooster.exe
+# Copy Visual Studio (MSVC) binary as primary eBooster.exe and eBooster-Portable.exe
 if ($msvcAvailable -and (Test-Path $msvcExe)) {
     Copy-Item -Path $msvcExe -Destination $targetExe -Force
-    Write-Host "      Copied Visual Studio (MSVC) binary -> $targetExe" -ForegroundColor Green
+    Copy-Item -Path $msvcExe -Destination $targetPortable -Force
+    Write-Host "      Staged Base Binary     -> $targetExe" -ForegroundColor Green
+    Write-Host "      Staged Portable Binary -> $targetPortable" -ForegroundColor Green
 } elseif (Test-Path $minGwExe) {
     Copy-Item -Path $minGwExe -Destination $targetExe -Force
-    Write-Host "      Copied MinGW fallback binary -> $targetExe" -ForegroundColor Green
+    Copy-Item -Path $minGwExe -Destination $targetPortable -Force
+    Write-Host "      Staged Base Binary (MinGW)     -> $targetExe" -ForegroundColor Green
+    Write-Host "      Staged Portable Binary (MinGW) -> $targetPortable" -ForegroundColor Green
 } else {
     throw "No compiled binary found to package!"
+}
+
+# Clean version for Inno Setup define (e.g. "1.0.3" from "v1.0.3")
+$cleanVer = $Version.TrimStart('v', 'V')
+if ([string]::IsNullOrWhiteSpace($cleanVer)) { $cleanVer = "1.0.0" }
+
+# 5. Look for Inno Setup Compiler (ISCC) and compile Installer
+$isccPaths = @(
+    "ISCC.exe",
+    "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+    "C:\Program Files\Inno Setup 6\ISCC.exe",
+    "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+    "C:\ProgramData\chocolatey\bin\iscc.exe"
+)
+$isccExe = $null
+foreach ($candidate in $isccPaths) {
+    if (Get-Command $candidate -ErrorAction SilentlyContinue) {
+        $isccExe = (Get-Command $candidate).Source
+        break
+    } elseif (Test-Path $candidate) {
+        $isccExe = $candidate
+        break
+    }
+}
+
+$issScript = Join-Path $RootDir "installer\eBooster.iss"
+if ($isccExe -and (Test-Path $issScript)) {
+    Write-Host "`n      Found Inno Setup Compiler: $isccExe" -ForegroundColor Cyan
+    Write-Host "      Compiling eBooster-Setup.exe (v$cleanVer)..." -ForegroundColor Cyan
+    & $isccExe "/DMyAppVersion=$cleanVer" $issScript | Out-Null
+    if ($LASTEXITCODE -eq 0 -and (Test-Path $targetSetup)) {
+        Write-Host "      Built Installer        -> $targetSetup" -ForegroundColor Green
+    } else {
+        Write-Host "      Inno Setup build failed (exit code: $LASTEXITCODE). Continuing." -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "      Inno Setup not found locally. Installer will be built automatically on GitHub Actions CI/CD." -ForegroundColor Yellow
 }
 
 # Verification and Summary
@@ -137,10 +182,15 @@ $sizeMB = [math]::Round($exeItem.Length / 1MB, 2)
 $hash = (Get-FileHash -Path $targetExe -Algorithm SHA256).Hash
 
 Write-Host "`n======================================================================" -ForegroundColor Green
-Write-Host "                     BUILD SUCCESSFUL (STANDALONE)                    " -ForegroundColor Green
+Write-Host "                BUILD & PACKAGING SUCCESSFUL                          " -ForegroundColor Green
 Write-Host "======================================================================" -ForegroundColor Green
-Write-Host "Version       : $Version" -ForegroundColor Yellow
-Write-Host "Binary Output : $targetExe" -ForegroundColor Cyan
-Write-Host "File Size     : $sizeMB MB ($($exeItem.Length) bytes)" -ForegroundColor White
-Write-Host "SHA256 Hash   : $hash" -ForegroundColor Gray
+Write-Host "Target Version : $Version" -ForegroundColor Yellow
+Write-Host "Base Binary    : $targetExe ($sizeMB MB)" -ForegroundColor White
+Write-Host "Portable Binary: $targetPortable ($sizeMB MB)" -ForegroundColor Cyan
+if (Test-Path $targetSetup) {
+    $setupItem = Get-Item $targetSetup
+    $setupMB = [math]::Round($setupItem.Length / 1MB, 2)
+    Write-Host "Setup Package  : $targetSetup ($setupMB MB)" -ForegroundColor Magenta
+}
+Write-Host "SHA256 (Base)  : $hash" -ForegroundColor Gray
 Write-Host "======================================================================`n" -ForegroundColor Green

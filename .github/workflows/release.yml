@@ -22,23 +22,35 @@ jobs:
       - name: Setup MSBuild and Visual Studio Tools
         uses: microsoft/setup-msbuild@v2
 
-      - name: Build Standalone Executable
+      - name: Install Inno Setup Compiler
+        shell: powershell
+        run: |
+          choco install innosetup --no-progress -y
+
+      - name: Build Standalone, Portable & Setup Installer
         shell: powershell
         run: |
           $versionTag = "${{ github.ref_name }}"
-          Write-Host "Building standalone eBooster.exe for: $versionTag" -ForegroundColor Cyan
+          Write-Host "Building eBooster Release packages for: $versionTag" -ForegroundColor Cyan
           
-          # Execute the standalone release build script (MSVC standalone /MT)
+          # Ensure Inno Setup is on PATH
+          if (Test-Path "C:\Program Files (x86)\Inno Setup 6") {
+            $env:PATH = "C:\Program Files (x86)\Inno Setup 6;$env:PATH"
+          }
+          
+          # Execute the release build script (MSVC standalone /MT + Inno Setup)
           powershell -ExecutionPolicy Bypass -File scripts\build_release.ps1 -Version "$versionTag" -SkipMinGW
           
           $distExe = "dist\eBooster.exe"
-          if (-not (Test-Path $distExe)) {
-            throw "Executable was not produced at: $distExe"
-          }
+          $distPortable = "dist\eBooster-Portable.exe"
+          $distSetup = "dist\eBooster-Setup.exe"
           
-          # Compute and display SHA256 hash
-          $exeHash = (Get-FileHash -Path $distExe -Algorithm SHA256).Hash
-          Write-Host "eBooster.exe SHA256: $exeHash" -ForegroundColor Green
+          if (-not (Test-Path $distExe)) { throw "Executable was not produced at: $distExe" }
+          if (-not (Test-Path $distPortable)) { throw "Portable executable was not produced at: $distPortable" }
+          if (-not (Test-Path $distSetup)) { throw "Setup installer was not produced at: $distSetup" }
+          
+          Write-Host "`nGenerated Release Artifacts in dist/:" -ForegroundColor Green
+          Get-ChildItem -Path dist\ | Format-Table Name, Length, LastWriteTime
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -47,6 +59,8 @@ jobs:
           name: eBooster Pro ${{ github.ref_name }}
           generate_release_notes: true
           files: |
+            dist/eBooster-Setup.exe
+            dist/eBooster-Portable.exe
             dist/eBooster.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
