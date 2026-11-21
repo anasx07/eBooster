@@ -43,3 +43,9 @@ tools/
 .github_token
 *.secret
 .env
+
+# AI Agent Guides & Local Instructions
+GEMINI.md
+CLAUDE.md
+AGENTS.md
+
