@@ -4262,48 +4262,87 @@ void GuiApp::UnregisterOverlayHotkey() {
 }
 
 bool GuiApp::IsStartWithWindowsEnabled() const {
-    HKEY hKey = nullptr;
-    const wchar_t* subKey = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-    if (RegOpenKeyExW(HKEY_CURRENT_USER, subKey, 0, KEY_READ, &hKey) != ERROR_SUCCESS) {
-        return false;
+    // Check if scheduled task exists in Task Scheduler
+    SHELLEXECUTEINFOW sei = { sizeof(sei) };
+    sei.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
+    sei.lpVerb = L"open";
+    sei.lpFile = L"schtasks.exe";
+    sei.lpParameters = L"/query /tn \"eBooster\"";
+    sei.nShow = SW_HIDE;
+
+    if (ShellExecuteExW(&sei)) {
+        if (sei.hProcess) {
+            WaitForSingleObject(sei.hProcess, 3000);
+            DWORD exitCode = 1;
+            GetExitCodeProcess(sei.hProcess, &exitCode);
+            CloseHandle(sei.hProcess);
+            if (exitCode == 0) return true;
+        }
     }
 
-    DWORD type = 0;
-    DWORD dataSize = 0;
-    LSTATUS status = RegQueryValueExW(hKey, L"eBooster", nullptr, &type, nullptr, &dataSize);
-    RegCloseKey(hKey);
-    return (status == ERROR_SUCCESS && dataSize > 0);
+    // Fallback: check legacy HKCU Run key
+    HKEY hKey = nullptr;
+    const wchar_t* subKey = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, subKey, 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+        DWORD type = 0;
+        DWORD dataSize = 0;
+        LSTATUS status = RegQueryValueExW(hKey, L"eBooster", nullptr, &type, nullptr, &dataSize);
+        RegCloseKey(hKey);
+        if (status == ERROR_SUCCESS && dataSize > 0) return true;
+    }
+
+    return m_prefs.startWithWindows;
 }
 
 bool GuiApp::SetStartWithWindows(bool enable) {
+    // 1. Clean up legacy HKCU\...\Run key to eliminate dead Task Manager entry (Windows blocks requireAdministrator apps in Run key)
     HKEY hKey = nullptr;
     const wchar_t* subKey = L"Software\\Microsoft\\Windows\\CurrentVersion\\Run";
-    LSTATUS status = RegOpenKeyExW(HKEY_CURRENT_USER, subKey, 0, KEY_READ | KEY_WRITE, &hKey);
-    if (status != ERROR_SUCCESS) {
-        return false;
+    if (RegOpenKeyExW(HKEY_CURRENT_USER, subKey, 0, KEY_SET_VALUE, &hKey) == ERROR_SUCCESS) {
+        RegDeleteValueW(hKey, L"eBooster");
+        RegCloseKey(hKey);
     }
 
+    // 2. Manage Windows Task Scheduler with /rl highest
+    // Because eBooster requires Administrator privileges (WFP packet filter & low-latency network tweaks),
+    // Windows Explorer silently blocks it from standard Run key / Startup folder at boot.
+    // Windows Task Scheduler with /rl highest is the official, silent, UAC-free way to launch elevated gaming utilities on logon.
+    wchar_t exePath[MAX_PATH] = {0};
+    GetModuleFileNameW(nullptr, exePath, MAX_PATH);
+
+    std::wstring cmd;
     if (enable) {
-        wchar_t exePath[MAX_PATH] = {0};
-        GetModuleFileNameW(nullptr, exePath, MAX_PATH);
-        std::wstring runCmd = std::format(L"\"{}\" --minimized", exePath);
-        DWORD dataSize = static_cast<DWORD>((runCmd.length() + 1) * sizeof(wchar_t));
-        status = RegSetValueExW(hKey, L"eBooster", 0, REG_SZ, reinterpret_cast<const BYTE*>(runCmd.c_str()), dataSize);
-        if (status == ERROR_SUCCESS) {
-            Log(LogLevel::Info, "Registered eBooster in Windows Run registry key (HKCU\\...\\Run).");
-        }
+        cmd = std::format(L"/create /tn \"eBooster\" /tr \"\\\"{}\\\" --minimized\" /sc onlogon /rl highest /f", exePath);
     } else {
-        status = RegDeleteValueW(hKey, L"eBooster");
-        if (status == ERROR_FILE_NOT_FOUND) {
-            status = ERROR_SUCCESS;
-        }
-        if (status == ERROR_SUCCESS) {
-            Log(LogLevel::Info, "Removed eBooster from Windows Run registry key.");
+        cmd = L"/delete /tn \"eBooster\" /f";
+    }
+
+    SHELLEXECUTEINFOW sei = { sizeof(sei) };
+    sei.fMask = SEE_MASK_NOCLOSEPROCESS | SEE_MASK_NOASYNC;
+    sei.lpVerb = L"open";
+    sei.lpFile = L"schtasks.exe";
+    sei.lpParameters = cmd.c_str();
+    sei.nShow = SW_HIDE;
+
+    bool success = false;
+    if (ShellExecuteExW(&sei)) {
+        if (sei.hProcess) {
+            WaitForSingleObject(sei.hProcess, 5000);
+            DWORD exitCode = 1;
+            GetExitCodeProcess(sei.hProcess, &exitCode);
+            CloseHandle(sei.hProcess);
+            success = (exitCode == 0);
         }
     }
 
-    RegCloseKey(hKey);
-    return (status == ERROR_SUCCESS);
+    if (success) {
+        LogFmt(LogLevel::Info, "Successfully {} eBooster Windows Startup task in Task Scheduler (/rl highest, silent logon).",
+               enable ? "registered" : "removed");
+    } else {
+        LogFmt(LogLevel::Warn, "Task Scheduler schtasks.exe command failed (enable={}).", enable);
+    }
+
+    return success;
 }
 
 void GuiApp::ToggleInGameOverlay() {

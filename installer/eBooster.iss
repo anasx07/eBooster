@@ -64,10 +64,13 @@ Source: "..\configs\*"; DestDir: "{app}\configs"; Flags: ignoreversion recursesu
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\assets\app.ico"; Tasks: startmenuicon
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\assets\app.ico"; Tasks: desktopicon
-Name: "{userstartup}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Parameters: "--minimized"; IconFilename: "{app}\assets\app.ico"; Tasks: startupicon
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
+Filename: "schtasks.exe"; Parameters: "/create /tn ""eBooster"" /tr """"{app}\{#MyAppExeName}"""" --minimized"" /sc onlogon /rl highest /f"; Flags: runhidden; Tasks: startupicon
+
+[UninstallRun]
+Filename: "schtasks.exe"; Parameters: "/delete /tn ""eBooster"" /f"; Flags: runhidden
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\cache"
