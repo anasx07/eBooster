@@ -36,7 +36,6 @@ set(CORE_SOURCES
     src/DnsRelayController.cpp
     src/ProfileManager.cpp
     src/SteamDetector.cpp
-    src/TextureLoader.cpp
     src/BoosterEngine.cpp
     src/NetworkOptimizer.cpp
     src/UserPreferences.cpp
