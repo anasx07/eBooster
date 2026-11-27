@@ -2,7 +2,7 @@
 ; eBooster Pro - Professional Gaming Network Optimizer & Anti-Lag Shield
 
 #ifndef MyAppVersion
-#define MyAppVersion "1.0.3"
+#define MyAppVersion "1.0.4"
 #endif
 
 #define MyAppName "eBooster Pro"
@@ -68,10 +68,10 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilen
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#StringChange(MyAppName, '&', '&&')}}"; Flags: nowait postinstall skipifsilent
-Filename: "schtasks.exe"; Parameters: "/create /tn ""eBooster"" /tr """"{app}\{#MyAppExeName}"""" --minimized"" /sc onlogon /rl highest /f"; Flags: runhidden; Tasks: startupicon
+Filename: "schtasks.exe"; Parameters: "/create /tn ""eBooster"" /tr ""\""{app}\{#MyAppExeName}\"" --minimized"" /sc onlogon /rl highest /f"; Flags: runhidden; Tasks: startupicon
 
 [UninstallRun]
-Filename: "schtasks.exe"; Parameters: "/delete /tn ""eBooster"" /f"; Flags: runhidden
+Filename: "schtasks.exe"; Parameters: "/delete /tn ""eBooster"" /f"; Flags: runhidden; RunOnceId: "RemoveStartupTask"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\cache"
