@@ -26,6 +26,19 @@ static int RunGuiApplication(bool startMinimized) {
     // Register top-level crash filter to clean up state even on unexpected crash
     SetUnhandledExceptionFilter(EmergencyCrashFilter);
 
+    // Enforce Single-Instance execution to prevent competing WFP engines
+    HANDLE hMutex = CreateMutexW(nullptr, TRUE, L"Global\\eBooster_Pro_SingleInstance_Mutex");
+    if (hMutex && GetLastError() == ERROR_ALREADY_EXISTS) {
+        HWND hExisting = FindWindowW(L"eBoosterWebViewHostClass", nullptr);
+        if (hExisting) {
+            ShowWindow(hExisting, SW_SHOW);
+            ShowWindow(hExisting, SW_RESTORE);
+            SetForegroundWindow(hExisting);
+        }
+        CloseHandle(hMutex);
+        return 0;
+    }
+
     // Initialize COM for WebView2
     CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
 
@@ -36,11 +49,13 @@ static int RunGuiApplication(bool startMinimized) {
     int showCmd = startMinimized ? SW_HIDE : SW_SHOWDEFAULT;
     if (!app.Initialize(hInstance, showCmd)) {
         CoUninitialize();
+        if (hMutex) CloseHandle(hMutex);
         return 1;
     }
 
     app.Run();
     CoUninitialize();
+    if (hMutex) CloseHandle(hMutex);
     return 0;
 }
 

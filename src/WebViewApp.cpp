@@ -7,6 +7,7 @@
 #include <shellapi.h>
 #include <tlhelp32.h>
 #include <filesystem>
+#include <fstream>
 #include <algorithm>
 #include <cmath>
 #include <sstream>
@@ -31,7 +32,17 @@ enum TrayMenuCmd {
 
 namespace ebooster {
 
+static std::wstring GetCurrentExePath() {
+    wchar_t buf[MAX_PATH]{};
+    DWORD len = GetModuleFileNameW(nullptr, buf, MAX_PATH);
+    if (len > 0 && len < MAX_PATH) {
+        return std::wstring(buf, len);
+    }
+    return (GetExecutableDir() / L"eBooster.exe").wstring();
+}
+
 static bool IsExeRunning(const std::string& exeName) {
+    if (exeName.empty()) return false;
     HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
     if (hSnap == INVALID_HANDLE_VALUE) return false;
 
@@ -87,6 +98,31 @@ static bool IsIgnoredAutoBoostExe(const std::string& exeName, const std::string&
     return false;
 }
 
+static bool ExtractEmbeddedUiHtml(HINSTANCE hInstance, const std::filesystem::path& targetDir) {
+    HRSRC hRes = FindResourceW(hInstance, MAKEINTRESOURCEW(101), RT_RCDATA);
+    if (!hRes) return false;
+
+    HGLOBAL hMem = LoadResource(hInstance, hRes);
+    if (!hMem) return false;
+
+    DWORD size = SizeofResource(hInstance, hRes);
+    const void* data = LockResource(hMem);
+    if (!data || size == 0) return false;
+
+    std::error_code ec;
+    std::filesystem::create_directories(targetDir, ec);
+    auto outPath = targetDir / "index.html";
+    auto tmpPath = targetDir / "index.html.tmp";
+
+    std::ofstream ofs(tmpPath, std::ios::binary | std::ios::trunc);
+    if (!ofs) return false;
+    ofs.write(static_cast<const char*>(data), static_cast<std::streamsize>(size));
+    ofs.close();
+
+    std::filesystem::rename(tmpPath, outPath, ec);
+    return !ec && std::filesystem::exists(outPath);
+}
+
 WebViewApp::WebViewApp() {
     s_pAppInstance = this;
 
@@ -112,10 +148,10 @@ WebViewApp::WebViewApp() {
     ApplySelectedProfile(0);
 
     // Initial ping history baseline
-    for (int i = 0; i < 60; ++i) {
-        m_pingHistory.push_back(24.0f + static_cast<float>((i % 3) * 0.5f));
+    for (int i = 0; i < 30; ++i) {
+        m_pingHistory.push_back(24.0f);
     }
-    for (int i = 0; i < 100; ++i) {
+    for (int i = 0; i < 50; ++i) {
         m_lossProbeHistory.push_back(true);
     }
 
@@ -161,8 +197,16 @@ bool WebViewApp::Initialize(HINSTANCE hInstance, int nCmdShow) {
 
     int screenWidth  = GetSystemMetrics(SM_CXSCREEN);
     int screenHeight = GetSystemMetrics(SM_CYSCREEN);
-    int posX = (m_prefs.windowX != -1) ? m_prefs.windowX : (screenWidth - windowWidth) / 2;
-    int posY = (m_prefs.windowY != -1) ? m_prefs.windowY : (screenHeight - windowHeight) / 2;
+    int posX = (screenWidth - windowWidth) / 2;
+    int posY = (screenHeight - windowHeight) / 2;
+
+    if (m_prefs.windowX != -1 && m_prefs.windowY != -1) {
+        POINT pt = { m_prefs.windowX, m_prefs.windowY };
+        if (MonitorFromPoint(pt, MONITOR_DEFAULTTONULL) != nullptr) {
+            posX = m_prefs.windowX;
+            posY = m_prefs.windowY;
+        }
+    }
 
     // Frameless window with native resize frame & shadow
     m_hWnd = CreateWindowExW(
@@ -184,9 +228,28 @@ bool WebViewApp::Initialize(HINSTANCE hInstance, int nCmdShow) {
     MARGINS margins = { 1, 1, 1, 1 };
     DwmExtendFrameIntoClientArea(m_hWnd, &margins);
 
-    // Init tray icon & hotkeys
+    // Initialize In-Game Overlay HUD
+    if (m_overlay) {
+        m_overlay->Initialize(m_hInstance, m_hWnd);
+        m_overlay->SetPosition(static_cast<OverlayPosition>(m_prefs.overlayPosition));
+        m_overlay->SetClickThrough(m_prefs.overlayClickThrough);
+        if (m_prefs.overlayEnabled) {
+            m_overlay->Show();
+        }
+    }
+
+    // Restore saved Konami geofilter / Anti-Lag Shield state
+    if (m_prefs.efootballAntiLagShield) {
+        NetworkOptimizer::SetEFootballAntiLagShield(true);
+    }
+    if (m_prefs.efootballAutoLock && m_prefs.selectedKonamiRegion > 0) {
+        NetworkOptimizer::SetEFootballGeofilter(static_cast<KonamiRegion>(m_prefs.selectedKonamiRegion));
+    }
+
+    // Init tray icon, hotkeys, and background ping probe
     InitTrayIcon();
     RegisterHotkeys();
+    StartPingWorker();
 
     // Start 1-second telemetry timer
     SetTimer(m_hWnd, IDT_TELEMETRY_TIMER, 1000, nullptr);
@@ -194,6 +257,13 @@ bool WebViewApp::Initialize(HINSTANCE hInstance, int nCmdShow) {
     // Initialize Microsoft WebView2
     if (!InitWebView2()) {
         Log(LogLevel::Error, "Failed to initialize Microsoft WebView2 host runtime.");
+        MessageBoxW(
+            m_hWnd,
+            L"Microsoft Edge WebView2 Runtime could not be initialized.\n\n"
+            L"Please install the Microsoft Edge WebView2 Evergreen Runtime from Microsoft to use eBooster Pro.",
+            L"eBooster Pro - WebView2 Runtime Required",
+            MB_OK | MB_ICONERROR
+        );
     }
 
     // Start minimized if requested
@@ -209,7 +279,8 @@ bool WebViewApp::Initialize(HINSTANCE hInstance, int nCmdShow) {
 
 bool WebViewApp::InitWebView2() {
     std::wstring userDataFolder = (GetAppDataDir() / "webview2_data").wstring();
-    std::filesystem::create_directories(userDataFolder);
+    std::error_code ec;
+    std::filesystem::create_directories(userDataFolder, ec);
 
     HRESULT hr = CreateCoreWebView2EnvironmentWithOptions(
         nullptr,
@@ -264,18 +335,28 @@ void WebViewApp::OnWebViewInitialized() {
         controller2->put_DefaultBackgroundColor(darkBg);
     }
 
-    // Map virtual host name "app.ebooster" to local "ui/dist" folder:
-    std::wstring uiDistFolder = (GetExecutableDir() / "ui" / "dist").wstring();
-    if (!std::filesystem::exists(uiDistFolder)) {
-        // Fallback for development workspace
-        uiDistFolder = (std::filesystem::current_path() / "ui" / "dist").wstring();
+    // Resolve UI bundle: check local ui/dist first, otherwise extract embedded RCDATA resource for standalone Portable EXE
+    std::filesystem::path uiDistPath = GetExecutableDir() / "ui" / "dist";
+    if (!std::filesystem::exists(uiDistPath / "index.html")) {
+        auto workspaceUi = std::filesystem::current_path() / "ui" / "dist";
+        if (std::filesystem::exists(workspaceUi / "index.html")) {
+            uiDistPath = workspaceUi;
+        } else {
+            auto cacheUi = GetAppCacheDir() / "ui";
+            if (ExtractEmbeddedUiHtml(m_hInstance, cacheUi)) {
+                uiDistPath = cacheUi;
+                Log(LogLevel::Info, "Extracted embedded single-file UI bundle to app cache.");
+            } else {
+                Log(LogLevel::Error, "Could not locate or extract UI bundle!");
+            }
+        }
     }
 
     ComPtr<ICoreWebView2_3> webView3;
     if (SUCCEEDED(m_webView.As(&webView3)) && webView3) {
         webView3->SetVirtualHostNameToFolderMapping(
             L"app.ebooster",
-            uiDistFolder.c_str(),
+            uiDistPath.wstring().c_str(),
             COREWEBVIEW2_HOST_RESOURCE_ACCESS_KIND_ALLOW
         );
     }
@@ -285,7 +366,11 @@ void WebViewApp::OnWebViewInitialized() {
     if (SUCCEEDED(m_webView->get_Settings(&settings)) && settings) {
         settings->put_AreDefaultContextMenusEnabled(FALSE);
         settings->put_IsStatusBarEnabled(FALSE);
+#ifdef NDEBUG
+        settings->put_AreDevToolsEnabled(FALSE);
+#else
         settings->put_AreDevToolsEnabled(TRUE);
+#endif
     }
 
     // Subscribe to IPC messages from React
@@ -380,7 +465,6 @@ void WebViewApp::HandleWebMessage(const std::wstring& messageJson) {
                 NetworkOptimizer::SetEFootballAntiLagShield(m_prefs.efootballAntiLagShield);
                 SaveUserPreferences();
             } else {
-                // Toggle gaming tweaks package
                 auto st = NetworkOptimizer::CheckStatus();
                 if (st.allOptimized) {
                     NetworkOptimizer::RevertToDefaults(details);
@@ -402,6 +486,20 @@ void WebViewApp::HandleWebMessage(const std::wstring& messageJson) {
             SaveUserPreferences();
             SendJsonToWeb(BuildStateJson());
         }
+        else if (cmd == "benchmark_servers") {
+            if (!m_isBenchmarking.load()) {
+                m_isBenchmarking.store(true);
+                HWND targetHwnd = m_hWnd;
+                NetworkOptimizer::BenchmarkAllKonamiRegions(
+                    m_isBenchmarking,
+                    [targetHwnd](KonamiRegion /*best*/, float /*ping*/) {
+                        if (targetHwnd && IsWindow(targetHwnd)) {
+                            PostMessageW(targetHwnd, WM_APP_STATE_CHANGED, 0, 0);
+                        }
+                    }
+                );
+            }
+        }
         else if (cmd == "set_setting") {
             std::string key = payload.value("key", "");
             bool val = payload.value("value", false);
@@ -418,7 +516,9 @@ void WebViewApp::HandleWebMessage(const std::wstring& messageJson) {
                 m_prefs.closeToTray = val;
             } else if (key == "overlayEnabled") {
                 m_prefs.overlayEnabled = val;
-                if (val) m_overlay->Show(); else m_overlay->Hide();
+                if (m_overlay) {
+                    if (val) m_overlay->Show(); else m_overlay->Hide();
+                }
             } else if (key == "efootballAntiLagShield") {
                 m_prefs.efootballAntiLagShield = val;
                 NetworkOptimizer::SetEFootballAntiLagShield(val);
@@ -436,7 +536,32 @@ void WebViewApp::HandleWebMessage(const std::wstring& messageJson) {
         }
         else if (cmd == "check_updates") {
             if (m_updateManager) {
-                m_updateManager->CheckForUpdatesAsync();
+                {
+                    std::lock_guard<std::mutex> lock(m_updateMutex);
+                    m_updateChecking = true;
+                    m_updateStatusMsg = "Checking GitHub Releases...";
+                }
+                SendJsonToWeb(BuildStateJson());
+
+                HWND targetHwnd = m_hWnd;
+                m_updateManager->CheckForUpdatesAsync([this, targetHwnd](const UpdateInfo& info) {
+                    {
+                        std::lock_guard<std::mutex> lock(m_updateMutex);
+                        m_updateChecking = false;
+                        m_updateAvailable = info.available;
+                        m_updateLatestVersion = info.latestVersion;
+                        if (m_updateManager->GetState() == UpdateState::Failed) {
+                            m_updateStatusMsg = m_updateManager->GetStatusMessage();
+                        } else if (info.available) {
+                            m_updateStatusMsg = "Update available: " + info.latestVersion;
+                        } else {
+                            m_updateStatusMsg = "You are on the latest version";
+                        }
+                    }
+                    if (targetHwnd && IsWindow(targetHwnd)) {
+                        PostMessageW(targetHwnd, WM_APP_STATE_CHANGED, 0, 0);
+                    }
+                });
             }
         }
         else if (cmd == "window_drag") {
@@ -496,6 +621,20 @@ std::string WebViewApp::BuildStateJson() const {
     }
     payload["profiles"] = profiles;
 
+    // Konami Server Regions from NetworkOptimizer
+    json regionsJson = json::array();
+    for (const auto& r : NetworkOptimizer::GetKonamiRegions()) {
+        json rj;
+        rj["regionCode"] = static_cast<int>(r.region);
+        rj["name"] = r.name;
+        rj["country"] = r.country;
+        rj["desc"] = r.desc;
+        rj["ip"] = r.probeIp.empty() ? (r.ips.empty() ? "0.0.0.0" : r.ips[0]) : r.probeIp;
+        rj["ping"] = r.livePing;
+        regionsJson.push_back(rj);
+    }
+    payload["konamiRegions"] = regionsJson;
+
     // Optimizer status
     auto optStatus = NetworkOptimizer::CheckStatus();
     json opt;
@@ -517,7 +656,7 @@ std::string WebViewApp::BuildStateJson() const {
     mi["remoteIp"] = match.serverIp.empty() ? "155.133.248.51" : match.serverIp;
     mi["serverRegion"] = match.clusterName.empty() ? "EU-Central" : match.clusterName;
     mi["packetRate"] = match.packetRate > 0 ? match.packetRate : 128;
-    mi["protocol"] = match.matchType.empty() ? "UDP" : match.matchType;
+    mi["protocol"] = match.matchType.empty() ? "Pure UDP" : match.matchType;
     payload["matchInfo"] = mi;
 
     // User preferences
@@ -534,6 +673,17 @@ std::string WebViewApp::BuildStateJson() const {
     prefs["storagePath"] = GetAppDataDir().string();
     prefs["isPortable"] = IsPortableMode();
     payload["prefs"] = prefs;
+
+    // Update status
+    {
+        std::lock_guard<std::mutex> lock(m_updateMutex);
+        json us;
+        us["checking"] = m_updateChecking;
+        us["available"] = m_updateAvailable;
+        us["latestVersion"] = m_updateLatestVersion;
+        us["message"] = m_updateStatusMsg;
+        payload["updateStatus"] = us;
+    }
 
     root["payload"] = payload;
     return root.dump();
@@ -557,11 +707,89 @@ std::string WebViewApp::BuildTelemetryJson() {
     mi["remoteIp"] = match.serverIp.empty() ? "155.133.248.51" : match.serverIp;
     mi["serverRegion"] = match.clusterName.empty() ? "EU-Central" : match.clusterName;
     mi["packetRate"] = match.packetRate > 0 ? match.packetRate : 128;
-    mi["protocol"] = match.matchType.empty() ? "UDP" : match.matchType;
+    mi["protocol"] = match.matchType.empty() ? "Pure UDP" : match.matchType;
     payload["matchInfo"] = mi;
 
     root["payload"] = payload;
     return root.dump();
+}
+
+void WebViewApp::StartPingWorker() {
+    if (m_pingThread.joinable()) return;
+    m_pingThread = std::jthread([this](std::stop_token st) {
+        PingWorkerLoop(st);
+    });
+}
+
+void WebViewApp::StopPingWorker() {
+    if (m_pingThread.joinable()) {
+        m_pingThread.request_stop();
+        m_pingThread.join();
+    }
+}
+
+void WebViewApp::PingWorkerLoop(std::stop_token st) {
+    while (!st.stop_requested()) {
+        std::string targetIp = m_prefs.ispBenchmarkIp.empty() ? "155.133.248.51" : m_prefs.ispBenchmarkIp;
+
+        // If a specific Konami region is selected, probe its IP
+        if (m_prefs.selectedKonamiRegion > 0) {
+            for (const auto& r : NetworkOptimizer::GetKonamiRegions()) {
+                if (static_cast<int>(r.region) == m_prefs.selectedKonamiRegion && !r.probeIp.empty()) {
+                    targetIp = r.probeIp;
+                    break;
+                }
+            }
+        }
+
+        // If in active match, probe match server IP
+        if (m_engine) {
+            auto match = m_engine->GetActiveMatchInfo();
+            if (match.isMatchActive && !match.serverIp.empty()) {
+                targetIp = match.serverIp;
+            }
+        }
+
+        auto rtt = PingHost(targetIp, 800);
+        {
+            std::lock_guard<std::mutex> lock(m_telemetryMutex);
+            m_lossProbeHistory.push_back(rtt.has_value());
+            if (m_lossProbeHistory.size() > 50) {
+                m_lossProbeHistory.pop_front();
+            }
+
+            size_t lost = 0;
+            for (bool ok : m_lossProbeHistory) {
+                if (!ok) ++lost;
+            }
+            float lossPct = (static_cast<float>(lost) / static_cast<float>(m_lossProbeHistory.size())) * 100.0f;
+            m_currentPacketLoss.store(lossPct);
+
+            if (rtt.has_value()) {
+                float pingMs = static_cast<float>(*rtt);
+                m_currentPing.store(pingMs);
+                m_baselineIspPing.store(std::max(pingMs + 14.0f, pingMs * 1.35f));
+
+                m_pingHistory.push_back(pingMs);
+                if (m_pingHistory.size() > 30) {
+                    m_pingHistory.pop_front();
+                }
+
+                // Calculate rolling jitter (mean absolute consecutive delta)
+                if (m_pingHistory.size() >= 2) {
+                    float sumDelta = 0.0f;
+                    for (size_t i = 1; i < m_pingHistory.size(); ++i) {
+                        sumDelta += std::abs(m_pingHistory[i] - m_pingHistory[i - 1]);
+                    }
+                    m_currentJitter.store(sumDelta / static_cast<float>(m_pingHistory.size() - 1));
+                }
+            }
+        }
+
+        for (int i = 0; i < 15 && !st.stop_requested(); ++i) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        }
+    }
 }
 
 void WebViewApp::StartEngine() {
@@ -679,7 +907,7 @@ void WebViewApp::RemoveTrayIcon() {
 
 void WebViewApp::UpdateTrayIcon() {
     if (!m_trayIconActive) return;
-    if (m_isBoosting) {
+    if (m_isBoosting && m_selectedProfileIdx >= 0 && m_selectedProfileIdx < static_cast<int>(m_profiles.size())) {
         std::wstring tip = L"eBooster Pro - SHIELD ACTIVE: " + ToWideString(m_profiles[m_selectedProfileIdx].name);
         wcscpy_s(m_nid.szTip, tip.c_str());
     } else {
@@ -724,7 +952,7 @@ void WebViewApp::ShowTrayContextMenu() {
     } else if (cmd == IDM_TRAY_OPEN_DASHBOARD || cmd == IDM_TRAY_OPEN_SETTINGS) {
         RestoreFromTray();
     } else if (cmd == IDM_TRAY_EXIT) {
-        PostMessageW(m_hWnd, WM_CLOSE, 0, 0);
+        DestroyWindow(m_hWnd);
     }
 }
 
@@ -751,7 +979,7 @@ bool WebViewApp::IsStartWithWindowsEnabled() const {
 }
 
 bool WebViewApp::SetStartWithWindows(bool enable) {
-    std::wstring exePath = (GetExecutableDir() / L"eBooster.exe").wstring();
+    std::wstring exePath = GetCurrentExePath();
     std::wstring cmd;
     if (enable) {
         cmd = L"schtasks.exe /create /tn \"eBooster\" /tr \"\\\"" + exePath + L"\\\" --minimized\" /sc onlogon /rl highest /f";
@@ -822,6 +1050,14 @@ void WebViewApp::CheckAndProcessAutoBoost() {
 
     const auto& prof = m_profiles[m_selectedProfileIdx];
     bool gameRunning = IsExeRunning(prof.exeName);
+    if (!gameRunning) {
+        for (const auto& child : prof.childExes) {
+            if (IsExeRunning(child)) {
+                gameRunning = true;
+                break;
+            }
+        }
+    }
 
     if (gameRunning && !m_isBoosting && m_prefs.autoBoostOnLaunch) {
         StartEngine();
@@ -840,6 +1076,21 @@ void WebViewApp::SaveUserPreferences() {
     PreferencesManager::Save(ResolveConfigPath("configs/user_preferences.json"), m_prefs);
 }
 
+void WebViewApp::CaptureWindowGeometry() {
+    if (!m_hWnd || !IsWindow(m_hWnd) || IsIconic(m_hWnd)) return;
+    RECT rc{};
+    if (GetWindowRect(m_hWnd, &rc)) {
+        int w = rc.right - rc.left;
+        int h = rc.bottom - rc.top;
+        if (w >= 900 && h >= 550) {
+            m_prefs.windowX = rc.left;
+            m_prefs.windowY = rc.top;
+            m_prefs.windowWidth = w;
+            m_prefs.windowHeight = h;
+        }
+    }
+}
+
 void WebViewApp::Run() {
     MSG msg{};
     while (GetMessageW(&msg, nullptr, 0, 0)) {
@@ -849,11 +1100,20 @@ void WebViewApp::Run() {
 }
 
 void WebViewApp::Cleanup() {
+    CaptureWindowGeometry();
+    SaveUserPreferences();
+
+    StopPingWorker();
+    m_isBenchmarking.store(false);
+
     if (m_hWnd && IsWindow(m_hWnd)) {
         KillTimer(m_hWnd, IDT_TELEMETRY_TIMER);
     }
     UnregisterHotkeys();
     RemoveTrayIcon();
+    if (m_overlay) {
+        m_overlay->Shutdown();
+    }
     StopEngine();
 
     if (m_webViewController) {
@@ -881,8 +1141,8 @@ LRESULT CALLBACK WebViewApp::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
             // Provide smooth resize borders on frameless window
             RECT rc;
             GetWindowRect(hWnd, &rc);
-            int x = LOWORD(lParam);
-            int y = HIWORD(lParam);
+            int x = static_cast<int>(static_cast<short>(LOWORD(lParam)));
+            int y = static_cast<int>(static_cast<short>(HIWORD(lParam)));
             const int border = 8;
 
             bool left = x >= rc.left && x < rc.left + border;
@@ -909,6 +1169,13 @@ LRESULT CALLBACK WebViewApp::WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM 
                 if (app->m_webViewReady) {
                     app->SendJsonToWeb(app->BuildTelemetryJson());
                 }
+            }
+            return 0;
+        }
+
+        case WM_APP_STATE_CHANGED: {
+            if (app && app->m_webViewReady) {
+                app->SendJsonToWeb(app->BuildStateJson());
             }
             return 0;
         }

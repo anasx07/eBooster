@@ -112,12 +112,17 @@ export const Settings: React.FC<SettingsProps> = ({ state }) => {
         </div>
 
         <div className="flex items-center gap-3">
+          {state.updateStatus?.message && (
+            <span className="text-xs font-mono text-stadium-blue px-3 py-1.5 rounded-lg bg-stadium-blue/10 border border-stadium-blue/30">
+              {state.updateStatus.message}
+            </span>
+          )}
           <button
             onClick={handleCheckUpdates}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-midnight-800 hover:bg-midnight-700 text-xs font-semibold text-slate-300 border border-slate-700 transition-colors"
           >
-            <RefreshCw className="w-3.5 h-3.5 text-stadium-blue" />
-            <span>CHECK FOR UPDATES</span>
+            <RefreshCw className={`w-3.5 h-3.5 text-stadium-blue ${state.updateStatus?.checking ? 'animate-spin' : ''}`} />
+            <span>{state.updateStatus?.checking ? 'CHECKING...' : 'CHECK FOR UPDATES'}</span>
           </button>
         </div>
       </div>
@@ -193,7 +198,7 @@ export const Settings: React.FC<SettingsProps> = ({ state }) => {
           <RotateCcw className="w-3.5 h-3.5" />
           <span>Reset All Configuration to Factory Defaults</span>
         </button>
-        <span className="text-slate-600 font-mono">eBooster Pro v1.0.4 • 64-bit Native C++23</span>
+        <span className="text-slate-600 font-mono">eBooster Pro {state.version} • 64-bit Native C++23</span>
       </div>
     </div>
   );

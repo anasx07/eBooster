@@ -21,8 +21,10 @@
 #include <memory>
 #include <atomic>
 #include <mutex>
+#include <thread>
 
 #define WM_TRAYICON (WM_APP + 1)
+#define WM_APP_STATE_CHANGED (WM_APP + 2)
 
 namespace ebooster {
 
@@ -57,8 +59,12 @@ private:
     void SaveProfilesToDisk();
     void CheckAndProcessAutoBoost();
 
+    // Background Ping & Telemetry Probe
+    void StartPingWorker();
+    void StopPingWorker();
+    void PingWorkerLoop(std::stop_token st);
+
     // Network Optimizer
-    void RefreshOptimizerStatus();
     void ApplyNetworkOptimizer();
     void RevertNetworkOptimizer();
 
@@ -78,12 +84,10 @@ private:
     void ToggleInGameOverlay();
     void UpdateOverlayTelemetry();
 
-    // User Preferences
+    // User Preferences & Window Geometry
     void LoadUserPreferences();
     void SaveUserPreferences();
-
-    // High-DPI Scaling & Resizing
-    float m_dpiScale{1.0f};
+    void CaptureWindowGeometry();
 
     // Windows state
     HINSTANCE m_hInstance{nullptr};
@@ -106,8 +110,18 @@ private:
     std::atomic<float> m_baselineIspPing{48.0f};
     std::atomic<float> m_currentPacketLoss{0.0f};
     std::atomic<float> m_currentJitter{1.2f};
+    mutable std::mutex m_telemetryMutex;
     std::deque<float> m_pingHistory;
     std::deque<bool> m_lossProbeHistory;
+    std::jthread m_pingThread;
+    std::atomic<bool> m_isBenchmarking{false};
+
+    // Update status for UI
+    mutable std::mutex m_updateMutex;
+    bool m_updateChecking{false};
+    bool m_updateAvailable{false};
+    std::string m_updateLatestVersion;
+    std::string m_updateStatusMsg;
 
     // Subsystems
     std::unique_ptr<InGameOverlay> m_overlay;

@@ -148,7 +148,9 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onSelectTab }) => {
             <span className="text-neon-green font-mono font-bold">CLEAN</span>
           </div>
           <div className="my-2 flex items-baseline gap-2">
-            <span className="text-4xl font-heading font-bold text-neon-green">0.0</span>
+            <span className="text-4xl font-heading font-bold text-neon-green">
+              {state.packetLossPct.toFixed(1)}
+            </span>
             <span className="text-sm font-mono text-slate-400">%</span>
           </div>
           <span className="text-xs text-slate-400 font-mono">No dropped UDP datagrams</span>
@@ -161,7 +163,11 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onSelectTab }) => {
               <Server className="w-3.5 h-3.5 text-neon-magenta" />
               SERVER LOCK
             </span>
-            <span className="text-neon-magenta font-mono font-bold">LOCKED</span>
+            <span className={`font-mono font-bold ${
+              state.prefs.selectedKonamiRegion > 0 ? 'text-neon-magenta' : 'text-stadium-blue'
+            }`}>
+              {state.prefs.selectedKonamiRegion > 0 ? 'LOCKED' : 'AUTO'}
+            </span>
           </div>
           <div className="my-2">
             <div className="text-lg font-heading font-bold text-white truncate">
@@ -184,7 +190,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onSelectTab }) => {
               {state.matchInfo.isMatchActive ? 'LIVE MATCH IN PROGRESS' : 'STANDBY - GAME MONITORING ENGAGED'}
             </div>
             <div className="text-xs text-slate-400">
-              Packet Rate: {state.matchInfo.packetRate || 128} pkts/sec • Protocol: Pure UDP • Port Pacing: 0ms Delay
+              Packet Rate: {state.matchInfo.packetRate || 128} pkts/sec • Protocol: {state.matchInfo.protocol || 'Pure UDP'} • Port Pacing: 0ms Delay
             </div>
           </div>
         </div>
@@ -194,7 +200,16 @@ export const Dashboard: React.FC<DashboardProps> = ({ state, onSelectTab }) => {
           className="px-4 py-2 rounded-lg bg-stadium-blue/15 hover:bg-stadium-blue/25 text-stadium-blue border border-stadium-blue/40 text-xs font-semibold transition-colors flex items-center gap-2 whitespace-nowrap"
         >
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Kernel Tweaks Status (Active)</span>
+          <span>
+            Kernel Tweaks ({[
+              state.optimizer?.nagleDisabled,
+              state.optimizer?.throttlingDisabled,
+              state.optimizer?.responsivenessOptimized,
+              state.optimizer?.gamingPriorityElevated,
+              state.optimizer?.mpoDisabled,
+              state.optimizer?.efootballAntiLagShield
+            ].filter(Boolean).length}/6 Active)
+          </span>
         </button>
       </div>
     </div>

@@ -45,11 +45,28 @@ export interface AppPreferences {
   isPortable: boolean;
 }
 
+export interface KonamiRegionNode {
+  regionCode: number;
+  name: string;
+  country: string;
+  desc: string;
+  ip: string;
+  ping: number;
+}
+
+export interface UpdateStatusInfo {
+  checking: boolean;
+  available: boolean;
+  latestVersion: string;
+  message: string;
+}
+
 export interface AppState {
   version: string;
   isBoosting: boolean;
   selectedProfileIdx: number;
   profiles: GameProfile[];
+  konamiRegions?: KonamiRegionNode[];
   currentPing: number;
   baselineIspPing: number;
   packetLossPct: number;
@@ -57,4 +74,5 @@ export interface AppState {
   optimizer: OptimizerStatus;
   matchInfo: MatchInfo;
   prefs: AppPreferences;
+  updateStatus?: UpdateStatusInfo;
 }
