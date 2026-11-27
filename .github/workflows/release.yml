@@ -22,6 +22,17 @@ jobs:
       - name: Setup MSBuild and Visual Studio Tools
         uses: microsoft/setup-msbuild@v2
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build React UI
+        shell: powershell
+        run: |
+          npm ci --prefix ui
+          npm run build --prefix ui
+
       - name: Install Inno Setup Compiler
         shell: powershell
         run: |

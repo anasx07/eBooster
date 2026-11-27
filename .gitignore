@@ -1,11 +1,11 @@
 # Build directories
-build/
-build_mingw/
-build_msvc/
-dist/
-cache/
-bin/
-out/
+/build/
+/build_mingw/
+/build_msvc/
+/dist/
+/cache/
+/bin/
+/out/
 
 # Visual Studio / IDE files
 .vs/
@@ -23,6 +23,14 @@ out/
 *.ilk
 *.exe
 *.dll
+
+# Allow required vendor static library
+!third_party/webview2/x64/WebView2LoaderStatic.lib
+!third_party/webview2/x64/WebView2Loader.dll.lib
+!third_party/webview2/x64/WebView2Loader.dll
+
+# Node & Frontend dependencies
+ui/node_modules/
 
 # Archives & Shortcuts
 *.zip

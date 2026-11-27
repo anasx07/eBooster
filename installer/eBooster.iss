@@ -60,6 +60,7 @@ Source: "..\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\assets\app.ico"; DestDir: "{app}\assets"; Flags: ignoreversion
 Source: "..\assets\logo.png"; DestDir: "{app}\assets"; Flags: ignoreversion
 Source: "..\configs\*"; DestDir: "{app}\configs"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\ui\dist\*"; DestDir: "{app}\ui\dist"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\assets\app.ico"; Tasks: startmenuicon

@@ -139,6 +139,16 @@ if ($msvcAvailable -and (Test-Path $msvcExe)) {
     throw "No compiled binary found to package!"
 }
 
+# Copy configs and ui/dist to dist directory for portable standalone distribution
+if (Test-Path (Join-Path $RootDir "ui\dist")) {
+    Copy-Item -Path (Join-Path $RootDir "ui\dist") -Destination (Join-Path $distRootDir "ui\dist") -Recurse -Force
+    Write-Host "      Staged React UI dist   -> $(Join-Path $distRootDir 'ui\dist')" -ForegroundColor Green
+}
+if (Test-Path (Join-Path $RootDir "configs")) {
+    Copy-Item -Path (Join-Path $RootDir "configs") -Destination (Join-Path $distRootDir "configs") -Recurse -Force
+    Write-Host "      Staged Configs         -> $(Join-Path $distRootDir 'configs')" -ForegroundColor Green
+}
+
 # Clean version for Inno Setup define (e.g. "1.0.3" from "v1.0.3")
 $cleanVer = $Version.TrimStart('v', 'V')
 if ([string]::IsNullOrWhiteSpace($cleanVer)) { $cleanVer = "1.0.0" }

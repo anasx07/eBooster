@@ -22,8 +22,8 @@ endif()
 # Header includes
 include_directories(
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/imgui/backends
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/webview2/include
 )
 
 # Common engine sources
@@ -46,22 +46,12 @@ set(CORE_SOURCES
 )
 
 # -------------------------------------------------------------
-# Modern Desktop GUI Target (eBooster - DirectX 11 + Dear ImGui)
+# Modern Desktop GUI Target (eBooster - Native C++23 + WebView2)
 # -------------------------------------------------------------
-set(IMGUI_SOURCES
-    third_party/imgui/imgui.cpp
-    third_party/imgui/imgui_draw.cpp
-    third_party/imgui/imgui_tables.cpp
-    third_party/imgui/imgui_widgets.cpp
-    third_party/imgui/backends/imgui_impl_win32.cpp
-    third_party/imgui/backends/imgui_impl_dx11.cpp
-)
-
 add_executable(eBooster WIN32
     ${CORE_SOURCES}
     ${RESOURCE_SOURCES}
-    ${IMGUI_SOURCES}
-    src/GuiApp.cpp
+    src/WebViewApp.cpp
     src/gui_main.cpp
 )
 
@@ -71,25 +61,28 @@ target_link_libraries(eBooster PRIVATE
     advapi32
     tdh
     dnsapi
-    d3d11
-    d3dcompiler
-    dxgi
     dwmapi
     windowscodecs
-    urlmon
     ole32
+    oleaut32
     shlwapi
     crypt32
     winhttp
     shell32
+    version
+    urlmon
+    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/webview2/x64/WebView2LoaderStatic.lib
 )
 
 # -------------------------------------------------------------
-# Post-Build: Auto-sync configs/ directory to output binaries
+# Post-Build: Auto-sync configs/ and ui/dist/ to output binaries
 # -------------------------------------------------------------
 add_custom_command(TARGET eBooster POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_SOURCE_DIR}/configs"
         "$<TARGET_FILE_DIR:eBooster>/configs"
-    COMMENT "Auto-syncing configs/ to eBooster output directory"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+        "${CMAKE_CURRENT_SOURCE_DIR}/ui/dist"
+        "$<TARGET_FILE_DIR:eBooster>/ui/dist"
+    COMMENT "Auto-syncing configs/ and ui/dist/ to eBooster output directory"
 )

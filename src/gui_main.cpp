@@ -1,4 +1,4 @@
-#include "ebooster/GuiApp.hpp"
+#include "ebooster/WebViewApp.hpp"
 #include "ebooster/RouteController.hpp"
 #include "ebooster/DnsRelayController.hpp"
 #include "ebooster/NetworkOptimizer.hpp"
@@ -15,7 +15,7 @@ static LONG WINAPI EmergencyCrashFilter(EXCEPTION_POINTERS* pEx) {
 }
 
 static int RunGuiApplication(bool startMinimized) {
-    // Enable Per-Monitor V2 High-DPI Awareness for crisp 2K / 4K UI rendering
+    // Enable Per-Monitor V2 High-DPI Awareness
     typedef BOOL (WINAPI* PFN_SetProcessDpiAwarenessContext)(DPI_AWARENESS_CONTEXT);
     auto pfnSetProcessDpiAwarenessContext = reinterpret_cast<PFN_SetProcessDpiAwarenessContext>(
         reinterpret_cast<void*>(GetProcAddress(GetModuleHandleW(L"user32.dll"), "SetProcessDpiAwarenessContext")));
@@ -26,16 +26,21 @@ static int RunGuiApplication(bool startMinimized) {
     // Register top-level crash filter to clean up state even on unexpected crash
     SetUnhandledExceptionFilter(EmergencyCrashFilter);
 
+    // Initialize COM for WebView2
+    CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+
     HINSTANCE hInstance = GetModuleHandle(nullptr);
-    ebooster::GuiApp app;
+    ebooster::WebViewApp app;
     app.SetCmdLineMinimized(startMinimized);
 
     int showCmd = startMinimized ? SW_HIDE : SW_SHOWDEFAULT;
     if (!app.Initialize(hInstance, showCmd)) {
+        CoUninitialize();
         return 1;
     }
 
     app.Run();
+    CoUninitialize();
     return 0;
 }
 
