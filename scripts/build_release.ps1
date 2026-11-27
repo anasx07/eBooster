@@ -57,10 +57,34 @@ if ($running) {
     Write-Host "      No active processes found. Clean." -ForegroundColor Green
 }
 
-# 2. Build MinGW Release Binary (if requested)
+# 2. Build Visual Studio (MSVC) Release Binary FIRST (/MT Static Runtime, zero DLL dependencies)
+$msvcExe = Join-Path $RootDir "build_msvc\Release\eBooster.exe"
+$msvcAvailable = $false
+if (-not $SkipMSVC) {
+    Write-Host "`n[2/4] Building MSVC Standalone Release Binary (/MT Static Runtime)..." -ForegroundColor Cyan
+    try {
+        if (-not (Test-Path (Join-Path $RootDir "build_msvc"))) {
+            Write-Host "      Configuring CMake for MSVC..." -ForegroundColor Gray
+            cmake -B build_msvc -S .
+        }
+        cmake --build build_msvc --config Release --parallel
+        if ($LASTEXITCODE -eq 0 -and (Test-Path $msvcExe)) {
+            $msvcAvailable = $true
+            Write-Host "      MSVC build successful: $msvcExe" -ForegroundColor Green
+        } else {
+            if ($SkipMinGW) { throw "MSVC build failed (exit code $LASTEXITCODE)!" }
+            Write-Host "      MSVC build skipped or failed. Falling back to MinGW." -ForegroundColor Yellow
+        }
+    } catch {
+        if ($SkipMinGW) { throw $_ }
+        Write-Host "      MSVC build skipped ($($_.Exception.Message)). Falling back to MinGW." -ForegroundColor Yellow
+    }
+}
+
+# 3. Build MinGW Release Binary (fallback if MSVC is unavailable)
 $minGwExe = Join-Path $RootDir "build_mingw\eBooster.exe"
-if (-not $SkipMinGW -and -not (Test-Path (Join-Path $RootDir "build_msvc"))) {
-    Write-Host "`n[2/4] Building MinGW Standalone Release Binary..." -ForegroundColor Cyan
+if (-not $SkipMinGW -and -not $msvcAvailable) {
+    Write-Host "`n[3/4] Building MinGW Release Binary..." -ForegroundColor Cyan
     if (-not (Test-Path (Join-Path $RootDir "build_mingw"))) {
         Write-Host "      Configuring CMake for MinGW..." -ForegroundColor Gray
         cmake -G "MinGW Makefiles" -B build_mingw -S . -DCMAKE_BUILD_TYPE=Release
@@ -74,30 +98,6 @@ if (-not $SkipMinGW -and -not (Test-Path (Join-Path $RootDir "build_msvc"))) {
         throw "MinGW binary was not produced at: $minGwExe"
     }
     Write-Host "      MinGW build successful: $minGwExe" -ForegroundColor Green
-}
-
-# 3. Build Visual Studio (MSVC) Release Binary
-$msvcExe = Join-Path $RootDir "build_msvc\Release\eBooster.exe"
-$msvcAvailable = $false
-if (-not $SkipMSVC) {
-    Write-Host "`n[3/4] Building MSVC Standalone Release Binary (/MT Static Runtime)..." -ForegroundColor Cyan
-    try {
-        if (-not (Test-Path (Join-Path $RootDir "build_msvc"))) {
-            Write-Host "      Configuring CMake for MSVC..." -ForegroundColor Gray
-            cmake -B build_msvc -S .
-        }
-        cmake --build build_msvc --config Release --parallel
-        if ($LASTEXITCODE -eq 0 -and (Test-Path $msvcExe)) {
-            $msvcAvailable = $true
-            Write-Host "      MSVC build successful: $msvcExe" -ForegroundColor Green
-        } else {
-            if ($SkipMinGW) { throw "MSVC build failed (exit code $LASTEXITCODE)!" }
-            Write-Host "      MSVC build skipped or failed. Continuing with MinGW." -ForegroundColor Yellow
-        }
-    } catch {
-        if ($SkipMinGW) { throw $_ }
-        Write-Host "      MSVC build skipped ($($_.Exception.Message)). Continuing with MinGW." -ForegroundColor Yellow
-    }
 }
 
 # 4. Prepare Distribution Directory, Standalone, Portable & Installer

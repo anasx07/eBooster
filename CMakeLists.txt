@@ -70,8 +70,18 @@ target_link_libraries(eBooster PRIVATE
     shell32
     version
     urlmon
-    ${CMAKE_CURRENT_SOURCE_DIR}/third_party/webview2/x64/WebView2LoaderStatic.lib
+    $<$<CXX_COMPILER_ID:MSVC>:${CMAKE_CURRENT_SOURCE_DIR}/third_party/webview2/x64/WebView2LoaderStatic.lib>
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:${CMAKE_CURRENT_SOURCE_DIR}/third_party/webview2/x64/WebView2Loader.dll.lib>
 )
+
+if(NOT MSVC)
+    add_custom_command(TARGET eBooster POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            "${CMAKE_CURRENT_SOURCE_DIR}/third_party/webview2/x64/WebView2Loader.dll"
+            "$<TARGET_FILE_DIR:eBooster>/WebView2Loader.dll"
+        COMMENT "Copying WebView2Loader.dll for MinGW target"
+    )
+endif()
 
 # -------------------------------------------------------------
 # Post-Build: Auto-sync configs/ and ui/dist/ to output binaries

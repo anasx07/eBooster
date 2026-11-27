@@ -32,6 +32,46 @@ enum TrayMenuCmd {
 
 namespace ebooster {
 
+template <typename Interface, typename Arg1, typename Arg2, typename Fn>
+class WebViewCallback final : public Interface {
+public:
+    WebViewCallback(REFIID iid, Fn fn) : m_iid(iid), m_fn(std::move(fn)) {}
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppv) override {
+        if (!ppv) return E_POINTER;
+        if (IsEqualIID(riid, IID_IUnknown) || IsEqualIID(riid, m_iid)) {
+            *ppv = static_cast<Interface*>(this);
+            AddRef();
+            return S_OK;
+        }
+        *ppv = nullptr;
+        return E_NOINTERFACE;
+    }
+
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++m_ref; }
+    ULONG STDMETHODCALLTYPE Release() override {
+        ULONG c = --m_ref;
+        if (c == 0) delete this;
+        return c;
+    }
+
+    HRESULT STDMETHODCALLTYPE Invoke(Arg1 a1, Arg2 a2) override {
+        return m_fn(a1, a2);
+    }
+
+private:
+    std::atomic<ULONG> m_ref{1};
+    IID m_iid;
+    Fn m_fn;
+};
+
+template <typename Interface, typename Arg1, typename Arg2, typename Fn>
+ComPtr<Interface> MakeCallback(REFIID iid, Fn&& fn) {
+    ComPtr<Interface> ptr;
+    ptr.Attach(new WebViewCallback<Interface, Arg1, Arg2, std::decay_t<Fn>>(iid, std::forward<Fn>(fn)));
+    return ptr;
+}
+
 static std::wstring GetCurrentExePath() {
     wchar_t buf[MAX_PATH]{};
     DWORD len = GetModuleFileNameW(nullptr, buf, MAX_PATH);
@@ -282,39 +322,41 @@ bool WebViewApp::InitWebView2() {
     std::error_code ec;
     std::filesystem::create_directories(userDataFolder, ec);
 
+    auto envCb = MakeCallback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler, HRESULT, ICoreWebView2Environment*>(
+        IID_ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler,
+        [this](HRESULT res, ICoreWebView2Environment* env) -> HRESULT {
+            if (FAILED(res) || !env) {
+                LogFmt(LogLevel::Error, "CreateCoreWebView2Environment failed: 0x{:08X}", static_cast<unsigned long>(res));
+                return res;
+            }
+            m_webViewEnv = env;
+
+            auto ctrlCb = MakeCallback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler, HRESULT, ICoreWebView2Controller*>(
+                IID_ICoreWebView2CreateCoreWebView2ControllerCompletedHandler,
+                [this](HRESULT ctrlRes, ICoreWebView2Controller* controller) -> HRESULT {
+                    if (FAILED(ctrlRes) || !controller) {
+                        LogFmt(LogLevel::Error, "CreateCoreWebView2Controller failed: 0x{:08X}", static_cast<unsigned long>(ctrlRes));
+                        return ctrlRes;
+                    }
+
+                    m_webViewController = controller;
+                    m_webViewController->get_CoreWebView2(&m_webView);
+
+                    OnWebViewInitialized();
+                    return S_OK;
+                }
+            );
+
+            m_webViewEnv->CreateCoreWebView2Controller(m_hWnd, ctrlCb.Get());
+            return S_OK;
+        }
+    );
+
     HRESULT hr = CreateCoreWebView2EnvironmentWithOptions(
         nullptr,
         userDataFolder.c_str(),
         nullptr,
-        Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
-            [this](HRESULT res, ICoreWebView2Environment* env) -> HRESULT {
-                if (FAILED(res) || !env) {
-                    LogFmt(LogLevel::Error, "CreateCoreWebView2Environment failed: 0x{:08X}", static_cast<unsigned long>(res));
-                    return res;
-                }
-                m_webViewEnv = env;
-
-                m_webViewEnv->CreateCoreWebView2Controller(
-                    m_hWnd,
-                    Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
-                        [this](HRESULT ctrlRes, ICoreWebView2Controller* controller) -> HRESULT {
-                            if (FAILED(ctrlRes) || !controller) {
-                                LogFmt(LogLevel::Error, "CreateCoreWebView2Controller failed: 0x{:08X}", static_cast<unsigned long>(ctrlRes));
-                                return ctrlRes;
-                            }
-
-                            m_webViewController = controller;
-                            m_webViewController->get_CoreWebView2(&m_webView);
-
-                            OnWebViewInitialized();
-                            return S_OK;
-                        }
-                    ).Get()
-                );
-
-                return S_OK;
-            }
-        ).Get()
+        envCb.Get()
     );
 
     return SUCCEEDED(hr);
@@ -330,7 +372,7 @@ void WebViewApp::OnWebViewInitialized() {
 
     // Set dark background color to prevent bright white flash during load
     ComPtr<ICoreWebView2Controller2> controller2;
-    if (SUCCEEDED(m_webViewController.As(&controller2)) && controller2) {
+    if (SUCCEEDED(m_webViewController->QueryInterface(IID_ICoreWebView2Controller2, reinterpret_cast<void**>(controller2.GetAddressOf()))) && controller2) {
         COREWEBVIEW2_COLOR darkBg = { 255, 8, 11, 20 }; // #080B14
         controller2->put_DefaultBackgroundColor(darkBg);
     }
@@ -353,7 +395,7 @@ void WebViewApp::OnWebViewInitialized() {
     }
 
     ComPtr<ICoreWebView2_3> webView3;
-    if (SUCCEEDED(m_webView.As(&webView3)) && webView3) {
+    if (SUCCEEDED(m_webView->QueryInterface(IID_ICoreWebView2_3, reinterpret_cast<void**>(webView3.GetAddressOf()))) && webView3) {
         webView3->SetVirtualHostNameToFolderMapping(
             L"app.ebooster",
             uiDistPath.wstring().c_str(),
@@ -375,20 +417,19 @@ void WebViewApp::OnWebViewInitialized() {
 
     // Subscribe to IPC messages from React
     EventRegistrationToken token;
-    m_webView->add_WebMessageReceived(
-        Callback<ICoreWebView2WebMessageReceivedEventHandler>(
-            [this](ICoreWebView2* /*sender*/, ICoreWebView2WebMessageReceivedEventArgs* args) -> HRESULT {
-                LPWSTR rawMsg = nullptr;
-                if (SUCCEEDED(args->TryGetWebMessageAsString(&rawMsg)) && rawMsg) {
-                    std::wstring ws(rawMsg);
-                    CoTaskMemFree(rawMsg);
-                    HandleWebMessage(ws);
-                }
-                return S_OK;
+    auto msgCb = MakeCallback<ICoreWebView2WebMessageReceivedEventHandler, ICoreWebView2*, ICoreWebView2WebMessageReceivedEventArgs*>(
+        IID_ICoreWebView2WebMessageReceivedEventHandler,
+        [this](ICoreWebView2* /*sender*/, ICoreWebView2WebMessageReceivedEventArgs* args) -> HRESULT {
+            LPWSTR rawMsg = nullptr;
+            if (SUCCEEDED(args->TryGetWebMessageAsString(&rawMsg)) && rawMsg) {
+                std::wstring ws(rawMsg);
+                CoTaskMemFree(rawMsg);
+                HandleWebMessage(ws);
             }
-        ).Get(),
-        &token
+            return S_OK;
+        }
     );
+    m_webView->add_WebMessageReceived(msgCb.Get(), &token);
 
     m_webViewReady = true;
 
